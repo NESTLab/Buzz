@@ -54,6 +54,9 @@ buzzobj_t buzzobj_new(uint16_t type) {
    else if(type == BUZZTYPE_CLOSURE) {
       o->c.value.actrec = buzzdarray_new(1, sizeof(buzzobj_t), NULL);
    }
+   else if(type == BUZZTYPE_REACTIVE) {
+      o->r.value.nextlist = buzzdarray_new(1, sizeof(buzzobj_t), NULL);
+   }
    /* All done */
    return o;
 }

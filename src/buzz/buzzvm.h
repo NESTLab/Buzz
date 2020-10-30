@@ -100,6 +100,7 @@ extern "C" {
       BUZZVM_INSTR_PUSHS,    // Push string constant onto stack
       BUZZVM_INSTR_PUSHCN,   // Push native closure onto stack
       BUZZVM_INSTR_PUSHCC,   // Push c-function closure onto stack
+      BUZZVM_INSTR_PUSHR,   // Push reactive variable onto stack
       BUZZVM_INSTR_PUSHL,    // Push native closure lambda onto stack
       BUZZVM_INSTR_LLOAD,    // Push local variable at given position
       BUZZVM_INSTR_LSTORE,   // Store stack-top value into local variable at given position, pop operand
@@ -414,6 +415,17 @@ extern "C" {
     * @return The VM state.
     */
    extern buzzvm_state buzzvm_pushs(buzzvm_t vm, uint16_t strid);
+
+   /*
+    * Pushes a reactive variable on the stack.
+    * Internally checks whether the operation is valid.
+    * This function is designed to be used within int-returning functions such as
+    * BuzzVM hook functions or buzzvm_step().
+    * @param vm The VM data.
+    * @param v The value.
+    * @return The VM state.
+    */
+   extern buzzvm_state buzzvm_pushr(buzzvm_t vm, int32_t v);
 
    /*
     * Pushes a lambda native closure on the stack.

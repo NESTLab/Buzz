@@ -16,7 +16,7 @@ const char *buzzvm_state_desc[] = { "no code", "ready", "done", "error", "stoppe
 
 const char *buzzvm_error_desc[] = { "none", "unknown instruction", "stack error", "wrong number of local variables", "pc out of range", "function id out of range", "type mismatch", "unknown string id", "unknown swarm id" };
 
-const char *buzzvm_instr_desc[] = {"nop", "done", "pushnil", "dup", "pop", "ret0", "ret1", "add", "sub", "mul", "div", "mod", "pow", "unm", "land", "lor", "lnot", "band", "bor", "bnot", "lshift", "rshift", "eq", "neq", "gt", "gte", "lt", "lte", "gload", "gstore", "pusht", "tput", "tget", "callc", "calls", "pushf", "pushi", "pushs", "pushcn", "pushcc", "pushl", "lload", "lstore", "jump", "jumpz", "jumpnz"};
+const char *buzzvm_instr_desc[] = {"nop", "done", "pushnil", "dup", "pop", "ret0", "ret1", "add", "sub", "mul", "div", "mod", "pow", "unm", "land", "lor", "lnot", "band", "bor", "bnot", "lshift", "rshift", "eq", "neq", "gt", "gte", "lt", "lte", "gload", "gstore", "pusht", "tput", "tget", "callc", "calls", "pushf", "pushi", "pushs", "pushcn", "pushcc", "pushr", "pushl", "lload", "lstore", "jump", "jumpz", "jumpnz"};
 
 static uint16_t SWARM_BROADCAST_PERIOD = 10;
 
@@ -37,12 +37,25 @@ static uint16_t SWARM_BROADCAST_PERIOD = 10;
    buzzobj_t op1 = buzzvm_stack_at(vm, 1);                              \
    buzzobj_t op2 = buzzvm_stack_at(vm, 2);                              \
    if((op1->o.type != BUZZTYPE_INT &&                                   \
-       op1->o.type != BUZZTYPE_FLOAT) ||                                \
+       op1->o.type != BUZZTYPE_FLOAT &&                                 \
+       op1->o.type != BUZZTYPE_REACTIVE) ||                             \
       (op2->o.type != BUZZTYPE_INT &&                                   \
-       op2->o.type != BUZZTYPE_FLOAT))  {                               \
+       op2->o.type != BUZZTYPE_FLOAT &&                                 \
+       op2->o.type != BUZZTYPE_REACTIVE)) {                             \
       (vm)->state = BUZZVM_STATE_ERROR;                                 \
       (vm)->error = BUZZVM_ERROR_TYPE;                                  \
       return (vm)->state;                                               \
+   }                                                                    \
+   if(op1->o.type == BUZZTYPE_REACTIVE ||                               \
+        op2->o.type == BUZZTYPE_REACTIVE) {                             \
+      if((op1->o.type != BUZZTYPE_INT &&                                \
+           op1->o.type != BUZZTYPE_REACTIVE) ||                         \
+         (op2->o.type != BUZZTYPE_INT &&                                \
+           op2->o.type != BUZZTYPE_REACTIVE)) {                         \
+        (vm)->state = BUZZVM_STATE_ERROR;                               \
+        (vm)->error = BUZZVM_ERROR_TYPE;                                \
+        return (vm)->state;                                             \
+      }                                                                 \
    }                                                                    \
    buzzdarray_pop(vm->stack);                                           \
    buzzdarray_pop(vm->stack);                                           \
@@ -64,9 +77,32 @@ static uint16_t SWARM_BROADCAST_PERIOD = 10;
       res->f.value = op2->i.value oper op1->f.value;                    \
       buzzvm_push(vm, res);                                             \
    }                                                                    \
-   else {                                                               \
+   else if(op1->o.type == BUZZTYPE_FLOAT &&                             \
+           op2->o.type == BUZZTYPE_FLOAT) {                             \
       buzzobj_t res = buzzheap_newobj((vm), BUZZTYPE_FLOAT);            \
       res->f.value = op2->f.value oper op1->f.value;                    \
+      buzzvm_push(vm, res);                                             \
+   }                                                                    \
+   else if(op1->o.type == BUZZTYPE_INT &&                               \
+           op2->o.type == BUZZTYPE_REACTIVE) {                          \
+      buzzobj_t res = buzzheap_newobj((vm), BUZZTYPE_REACTIVE);         \
+      res->r.value.value = op2->r.value.value oper op1->i.value;        \
+      buzzdarray_push(res->r.value.nextlist, &op2->r.value.rid);        \
+      buzzvm_push(vm, res);                                             \
+   }                                                                    \
+   else if(op1->o.type == BUZZTYPE_REACTIVE &&                          \
+           op2->o.type == BUZZTYPE_INT) {                               \
+      buzzobj_t res = buzzheap_newobj((vm), BUZZTYPE_REACTIVE);         \
+      res->r.value.value = op2->i.value oper op1->r.value.value;        \
+      buzzdarray_push(res->r.value.nextlist, &op1->r.value.rid);        \
+      buzzvm_push(vm, res);                                             \
+   }                                                                    \
+   else if(op1->o.type == BUZZTYPE_REACTIVE &&                          \
+           op2->o.type == BUZZTYPE_REACTIVE) {                          \
+      buzzobj_t res = buzzheap_newobj((vm), BUZZTYPE_REACTIVE);         \
+      res->r.value.value = op2->r.value.value oper op1->r.value.value;  \
+      buzzdarray_push(res->r.value.nextlist, &op1->r.value.rid);        \
+      buzzdarray_push(res->r.value.nextlist, &op2->r.value.rid);        \
       buzzvm_push(vm, res);                                             \
    }                                                                    \
    return (vm)->state;
@@ -928,6 +964,12 @@ buzzvm_state buzzvm_step(buzzvm_t vm) {
          if(buzzvm_pushcc(vm, arg) != BUZZVM_STATE_READY) return vm->state;
          break;
       }
+      case BUZZVM_INSTR_PUSHR: {
+         inc_pc();
+         get_arg(uint32_t);
+         if(buzzvm_pushr(vm, arg) != BUZZVM_STATE_READY) return vm->state;
+         break;
+      }
       case BUZZVM_INSTR_PUSHL: {
          inc_pc();
          get_arg(uint32_t);
@@ -1238,6 +1280,21 @@ buzzvm_state buzzvm_pushs(buzzvm_t vm, uint16_t strid) {
    o->s.value.str = buzzstrman_get(vm->strings, strid);
    buzzvm_push(vm, o);
    return BUZZVM_STATE_READY;
+}
+
+/****************************************/
+/****************************************/
+
+// TODO: BAD HACK!!!, placeholder for now
+uint16_t reactiveCounter = 0;
+
+buzzvm_state buzzvm_pushr(buzzvm_t vm, int32_t value) {
+   buzzobj_t o = buzzheap_newobj(vm, BUZZTYPE_REACTIVE);
+   o->r.value.value = value;
+   o->r.value.rid = reactiveCounter++;
+   
+   buzzvm_push(vm, o);
+   return vm->state;
 }
 
 /****************************************/
