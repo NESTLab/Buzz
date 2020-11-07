@@ -38,6 +38,15 @@ int print(buzzvm_t vm) {
          case BUZZTYPE_USERDATA:
             fprintf(stdout, "[userdata @%p]", o->u.value);
             break;
+         case BUZZTYPE_REACTIVE:
+            fprintf(stdout, "[reactive] %d:%d (dependentlist_size=%ld, fptrlist_size=%ld, done=%c, error=%c)",
+                            o->r.value.rid,
+                            o->r.value.value,
+                            o->r.value.dependentlist->size,
+                            o->r.value.fptrlist->size,
+                            o->r.value.isdone  ? 'y': 'n',
+                            o->r.value.iserror ? 'y': 'n');
+            break;
          default:
             break;
       }

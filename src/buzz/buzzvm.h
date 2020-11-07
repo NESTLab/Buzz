@@ -120,6 +120,13 @@ extern "C" {
    typedef int (*buzzvm_funp)(struct buzzvm_s* vm);
 
    /*
+    * closure pointer for REACTIVE_ON_NEXT.
+    * @param void.
+    * @return void.
+    */
+   typedef void (*buzzvm_reactnext_funp)(void);
+
+   /*
     * Data for local symbols
     */
    struct buzzvm_lsyms_s {
@@ -159,6 +166,8 @@ extern "C" {
       buzzvm_lsyms_t lsyms;
       /* Local variable table list */
       buzzdarray_t lsymts;
+      /* reactive variable table list */
+      buzzdarray_t reactives;
       /* Global symbols */
       buzzdict_t gsyms;
       /* Strings */
