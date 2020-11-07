@@ -103,7 +103,8 @@ extern "C" {
          uint32_t value;        // The reactive value
          uint8_t isdone;        // Flag for done state
          uint8_t iserror;       // Flag for error state
-         buzzdarray_t nextlist; // array of function pointers for next
+         buzzdarray_t fptrlist;    // array of closures to call on change
+         buzzdarray_t dependentlist; // array of next reactives
       } value;
    } buzzreactive_t;
 

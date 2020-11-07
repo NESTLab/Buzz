@@ -415,10 +415,11 @@ void buzzdebug_print_obj(FILE* stream,
             fprintf(stream, "[c-closure] %d", o->c.value.ref);
          break;
       case BUZZTYPE_REACTIVE:
-         fprintf(stream, "[reactive] %d:%d (nextlist_size=%ld, done=%c, error=%c))",
+         fprintf(stream, "[reactive] %d:%d (dependentlist_size=%ld, fptrlist_size=%ld, done=%c, error=%c)",
                             o->r.value.rid,
                             o->r.value.value,
-                            o->r.value.nextlist->size,
+                            o->r.value.dependentlist->size,
+                            o->r.value.fptrlist->size,
                             o->r.value.isdone  ? 'y': 'n',
                             o->r.value.iserror ? 'y': 'n');
          break;

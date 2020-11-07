@@ -86,23 +86,41 @@ static uint16_t SWARM_BROADCAST_PERIOD = 10;
    else if(op1->o.type == BUZZTYPE_INT &&                               \
            op2->o.type == BUZZTYPE_REACTIVE) {                          \
       buzzobj_t res = buzzheap_newobj((vm), BUZZTYPE_REACTIVE);         \
+      res->r.value.rid = buzzvm_reactive_get_new_rid(vm);               \
+      buzzobj_t op2_reactive = buzzvm_find_reactive_by_rid(vm,          \
+         op2->r.value.rid);                                             \
+      buzzdarray_push(op2_reactive->r.value.dependentlist,              \
+               &res->r.value.rid);                                      \
       res->r.value.value = op2->r.value.value oper op1->i.value;        \
-      buzzdarray_push(res->r.value.nextlist, &op2->r.value.rid);        \
+      buzzdarray_push(vm->reactives, &res);                             \
       buzzvm_push(vm, res);                                             \
    }                                                                    \
    else if(op1->o.type == BUZZTYPE_REACTIVE &&                          \
            op2->o.type == BUZZTYPE_INT) {                               \
       buzzobj_t res = buzzheap_newobj((vm), BUZZTYPE_REACTIVE);         \
+      res->r.value.rid = buzzvm_reactive_get_new_rid(vm);               \
+      buzzobj_t op1_reactive = buzzvm_find_reactive_by_rid(vm,          \
+         op1->r.value.rid);                                             \
+      buzzdarray_push(op1_reactive->r.value.dependentlist,              \
+               &res->r.value.rid);                                      \
       res->r.value.value = op2->i.value oper op1->r.value.value;        \
-      buzzdarray_push(res->r.value.nextlist, &op1->r.value.rid);        \
+      buzzdarray_push(vm->reactives, &res);                             \
       buzzvm_push(vm, res);                                             \
    }                                                                    \
    else if(op1->o.type == BUZZTYPE_REACTIVE &&                          \
            op2->o.type == BUZZTYPE_REACTIVE) {                          \
       buzzobj_t res = buzzheap_newobj((vm), BUZZTYPE_REACTIVE);         \
+      res->r.value.rid = buzzvm_reactive_get_new_rid(vm);               \
+      buzzobj_t op1_reactive = buzzvm_find_reactive_by_rid(vm,          \
+         op1->r.value.rid);                                             \
+      buzzdarray_push(op1_reactive->r.value.dependentlist,              \
+               &res->r.value.rid);                                      \
+      buzzobj_t op2_reactive = buzzvm_find_reactive_by_rid(vm,          \
+         op2->r.value.rid);                                             \
+      buzzdarray_push(op2_reactive->r.value.dependentlist,              \
+               &res->r.value.rid);                                      \
       res->r.value.value = op2->r.value.value oper op1->r.value.value;  \
-      buzzdarray_push(res->r.value.nextlist, &op1->r.value.rid);        \
-      buzzdarray_push(res->r.value.nextlist, &op2->r.value.rid);        \
+      buzzdarray_push(vm->reactives, &res);                             \
       buzzvm_push(vm, res);                                             \
    }                                                                    \
    return (vm)->state;
@@ -232,11 +250,12 @@ const char* buzzvm_strerror(buzzvm_t vm) {
 /****************************************/
 /****************************************/
 
-#define BUZZVM_STACKS_INIT_CAPACITY  20
-#define BUZZVM_STACK_INIT_CAPACITY   20
-#define BUZZVM_LSYMTS_INIT_CAPACITY  20
-#define BUZZVM_SYMS_INIT_CAPACITY    20
-#define BUZZVM_STRINGS_INIT_CAPACITY 20
+#define BUZZVM_STACKS_INIT_CAPACITY    20
+#define BUZZVM_STACK_INIT_CAPACITY     20
+#define BUZZVM_LSYMTS_INIT_CAPACITY    20
+#define BUZZVM_SYMS_INIT_CAPACITY      20
+#define BUZZVM_STRINGS_INIT_CAPACITY   20
+#define BUZZVM_REACTIVE_INIT_CAPACITY  20
 
 /****************************************/
 /****************************************/
@@ -569,6 +588,12 @@ buzzvm_t buzzvm_new(uint16_t robot) {
                             buzzdict_int32keyhash,
                             buzzdict_int32keycmp,
                             NULL);
+
+   /* Create local variable tables */
+   vm->reactives = buzzdarray_new(BUZZVM_REACTIVE_INIT_CAPACITY,
+                               sizeof(buzzreactive_t),
+                               NULL);
+   
    /* Create string list */
    vm->strings = buzzstrman_new();
    /* Create heap */
@@ -1285,14 +1310,61 @@ buzzvm_state buzzvm_pushs(buzzvm_t vm, uint16_t strid) {
 /****************************************/
 /****************************************/
 
-// TODO: BAD HACK!!!, placeholder for now
-uint16_t reactiveCounter = 0;
+int buzzvm_reactive_cmp(const void* a, const void* b) {
+   if(((buzzobj_t) a)->r.value.rid < ((buzzobj_t) b)->r.value.rid) return -1;
+   if(((buzzobj_t) a)->r.value.rid > ((buzzobj_t) b)->r.value.rid) return  1;
+   return 0;
+}
+
+/****************************************/
+/****************************************/
+
+buzzobj_t buzzvm_find_reactive_by_rid(buzzvm_t vm, uint16_t rid) {
+   buzzobj_t temp;
+   temp->o.type = BUZZTYPE_REACTIVE;
+   temp->r.value.rid = rid;
+   
+   uint32_t fpos = buzzdarray_find(vm->reactives, buzzvm_reactive_cmp, &temp);
+
+   if(fpos == buzzdarray_size(vm->reactives)) {
+      return NULL;
+   } else {
+      return buzzdarray_get(vm->reactives, fpos, buzzobj_t);
+   }
+}
+
+/****************************************/
+/****************************************/
+
+uint16_t buzzvm_reactive_get_new_rid(buzzvm_t vm) {
+   uint16_t new_rid = buzzdarray_size(vm->reactives);
+
+   buzzobj_t temp;
+   temp->o.type = BUZZTYPE_REACTIVE;
+      
+   while(new_rid < BUZZVM_REACTIVE_INIT_CAPACITY) {
+      temp->r.value.rid = new_rid;
+
+      uint32_t fpos = buzzdarray_find(vm->reactives, buzzvm_reactive_cmp, &temp);
+
+      if(fpos == buzzdarray_size(vm->reactives)) {
+         return new_rid;
+      }
+
+      new_rid += 1;
+   }
+}
+
+/****************************************/
+/****************************************/
 
 buzzvm_state buzzvm_pushr(buzzvm_t vm, int32_t value) {
    buzzobj_t o = buzzheap_newobj(vm, BUZZTYPE_REACTIVE);
    o->r.value.value = value;
-   o->r.value.rid = reactiveCounter++;
+   o->r.value.rid = buzzvm_reactive_get_new_rid(vm);
    
+   buzzdarray_push(vm->reactives, &o);
+
    buzzvm_push(vm, o);
    return vm->state;
 }
