@@ -55,8 +55,9 @@ buzzobj_t buzzobj_new(uint16_t type) {
       o->c.value.actrec = buzzdarray_new(1, sizeof(buzzobj_t), NULL);
    }
    else if(type == BUZZTYPE_REACTIVE) {
+      o->r.value.expressions   = buzzdarray_new(1, sizeof(buzzvm_reactive_expr_t), NULL); 
       o->r.value.dependentlist = buzzdarray_new(1, sizeof(uint32_t), NULL);
-      o->r.value.fptrlist    = buzzdarray_new(1, sizeof(buzzvm_reactnext_funp), NULL);
+      o->r.value.fptrlist      = buzzdarray_new(1, sizeof(buzzvm_reactnext_funp), NULL);
    }
    /* All done */
    return o;

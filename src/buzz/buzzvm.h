@@ -127,6 +127,18 @@ extern "C" {
    typedef void (*buzzvm_reactnext_funp)(void);
 
    /*
+    * Data for reactive expressions
+    */      
+   struct buzzvm_reactive_expr_s {
+      /* Operator */
+      char oper;
+      buzzobj_t op1;
+      buzzobj_t op2;
+   };
+   typedef struct buzzvm_reactive_expr_s* buzzvm_reactive_expr_t;
+
+
+   /*
     * Data for local symbols
     */
    struct buzzvm_lsyms_s {

@@ -92,6 +92,8 @@ static uint16_t SWARM_BROADCAST_PERIOD = 10;
       buzzdarray_push(op2_reactive->r.value.dependentlist,              \
                &res->r.value.rid);                                      \
       res->r.value.value = op2->r.value.value oper op1->i.value;        \
+      buzzvm_reactive_expr_t expr = {'oper', op1, op2};                 \
+      buzzdarray_push(res->r.value.expressions, &expr);                 \
       buzzdict_set(vm->reactives, &(res->r.value.rid), &res);           \
       buzzvm_push(vm, res);                                             \
    }                                                                    \
@@ -104,6 +106,8 @@ static uint16_t SWARM_BROADCAST_PERIOD = 10;
       buzzdarray_push(op1_reactive->r.value.dependentlist,              \
                &res->r.value.rid);                                      \
       res->r.value.value = op2->i.value oper op1->r.value.value;        \
+      buzzvm_reactive_expr_t expr = {'oper', op1, op2};                 \
+      buzzdarray_push(res->r.value.expressions, &expr);                 \
       buzzdict_set(vm->reactives, &(res->r.value.rid), &res);           \
       buzzvm_push(vm, res);                                             \
    }                                                                    \
@@ -120,6 +124,8 @@ static uint16_t SWARM_BROADCAST_PERIOD = 10;
       buzzdarray_push(op2_reactive->r.value.dependentlist,              \
                &res->r.value.rid);                                      \
       res->r.value.value = op2->r.value.value oper op1->r.value.value;  \
+      buzzvm_reactive_expr_t expr = {'oper', op1, op2};                 \
+      buzzdarray_push(res->r.value.expressions, &expr);                  \
       buzzdict_set(vm->reactives, &(res->r.value.rid), &res);           \
       buzzvm_push(vm, res);                                             \
    }                                                                    \
