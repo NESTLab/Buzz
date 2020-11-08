@@ -167,7 +167,7 @@ extern "C" {
       /* Local variable table list */
       buzzdarray_t lsymts;
       /* reactive variable table list */
-      buzzdarray_t reactives;
+      buzzdict_t reactives;
       /* Global symbols */
       buzzdict_t gsyms;
       /* Strings */

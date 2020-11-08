@@ -99,7 +99,7 @@ extern "C" {
       uint16_t type;
       uint16_t marker;
       struct {
-         uint16_t rid;          // The reactive id
+         uint32_t rid;          // The reactive id
          uint32_t value;        // The reactive value
          uint8_t isdone;        // Flag for done state
          uint8_t iserror;       // Flag for error state

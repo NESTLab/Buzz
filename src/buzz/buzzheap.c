@@ -195,6 +195,10 @@ void buzzheap_gsymobj_mark(const void* key, void* data, void* params) {
    buzzheap_obj_mark(*(buzzobj_t*)data, params);
 }
 
+void buzzheap_reactive_mark(const void* key, void* data, void* params) {
+   buzzheap_obj_mark(*(buzzobj_t*)data, params);
+}
+
 void buzzheap_gc(struct buzzvm_s* vm) {
    buzzheap_t h = vm->heap;
    /* Is GC necessary? */
@@ -209,6 +213,8 @@ void buzzheap_gc(struct buzzvm_s* vm) {
    buzzdarray_foreach(vm->stacks, buzzheap_stack_mark, vm);
    /* Go through all the objects in the local symbol stack and mark them */
    buzzdarray_foreach(vm->lsymts, buzzheap_lsyms_mark, vm);
+   /* Go through all the objects in the reactives and mark them */
+   buzzdict_foreach(vm->reactives, buzzheap_reactive_mark, vm);
    /* Go through all the objects in the virtual stigmergy and mark them */
    buzzdict_foreach(vm->vstigs, buzzheap_vstig_mark, vm);
    /* Go through all the objects in the listeners and mark them */
