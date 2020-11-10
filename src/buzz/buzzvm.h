@@ -44,7 +44,8 @@ extern "C" {
       BUZZVM_ERROR_FLIST,    // Function call id out of range
       BUZZVM_ERROR_TYPE,     // Type mismatch
       BUZZVM_ERROR_STRING,   // Unknown string id
-      BUZZVM_ERROR_SWARM     // Unknown swarm id
+      BUZZVM_ERROR_SWARM,    // Unknown swarm id
+      BUZZVM_ERROR_RID_LIMIT // Reactive RID creation limit reached
    } buzzvm_error;
    extern const char *buzzvm_error_desc[];
 
@@ -131,11 +132,11 @@ extern "C" {
     */      
    struct buzzvm_reactive_expr_s {
       /* Operator */
-      char oper;
+      char optr;
       buzzobj_t op1;
       buzzobj_t op2;
    };
-   typedef struct buzzvm_reactive_expr_s* buzzvm_reactive_expr_t;
+   typedef struct buzzvm_reactive_expr_s buzzvm_react_expr_t;
 
 
    /*

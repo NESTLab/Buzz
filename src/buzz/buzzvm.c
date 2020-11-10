@@ -83,51 +83,91 @@ static uint16_t SWARM_BROADCAST_PERIOD = 10;
       res->f.value = op2->f.value oper op1->f.value;                    \
       buzzvm_push(vm, res);                                             \
    }                                                                    \
-   else if(op1->o.type == BUZZTYPE_INT &&                               \
+   else if(op1->o.type == BUZZTYPE_REACTIVE ||                          \
            op2->o.type == BUZZTYPE_REACTIVE) {                          \
+                                                                        \
+      /* If atleast one operand is reactive  */                         \
       buzzobj_t res = buzzheap_newobj((vm), BUZZTYPE_REACTIVE);         \
       res->r.value.rid = buzzvm_reactive_get_new_rid(vm);               \
-      buzzobj_t op2_reactive = *buzzdict_get(vm->reactives,             \
-                                     &(op2->r.value.rid), buzzobj_t);   \
-      buzzdarray_push(op2_reactive->r.value.dependentlist,              \
-               &res->r.value.rid);                                      \
-      res->r.value.value = op2->r.value.value oper op1->i.value;        \
-      buzzvm_reactive_expr_t expr = {'oper', op1, op2};                 \
-      buzzdarray_push(res->r.value.expressions, &expr);                 \
-      buzzdict_set(vm->reactives, &(res->r.value.rid), &res);           \
-      buzzvm_push(vm, res);                                             \
-   }                                                                    \
-   else if(op1->o.type == BUZZTYPE_REACTIVE &&                          \
-           op2->o.type == BUZZTYPE_INT) {                               \
-      buzzobj_t res = buzzheap_newobj((vm), BUZZTYPE_REACTIVE);         \
-      res->r.value.rid = buzzvm_reactive_get_new_rid(vm);               \
-      buzzobj_t op1_reactive = *buzzdict_get(vm->reactives,             \
-                                     &(op1->r.value.rid), buzzobj_t);   \
-      buzzdarray_push(op1_reactive->r.value.dependentlist,              \
-               &res->r.value.rid);                                      \
-      res->r.value.value = op2->i.value oper op1->r.value.value;        \
-      buzzvm_reactive_expr_t expr = {'oper', op1, op2};                 \
-      buzzdarray_push(res->r.value.expressions, &expr);                 \
-      buzzdict_set(vm->reactives, &(res->r.value.rid), &res);           \
-      buzzvm_push(vm, res);                                             \
-   }                                                                    \
-   else if(op1->o.type == BUZZTYPE_REACTIVE &&                          \
-           op2->o.type == BUZZTYPE_REACTIVE) {                          \
-      buzzobj_t res = buzzheap_newobj((vm), BUZZTYPE_REACTIVE);         \
-      res->r.value.rid = buzzvm_reactive_get_new_rid(vm);               \
-      buzzobj_t op1_reactive = *buzzdict_get(vm->reactives,             \
-                                     &(op1->r.value.rid), buzzobj_t);   \
-      buzzdarray_push(op1_reactive->r.value.dependentlist,              \
-               &res->r.value.rid);                                      \
-      buzzobj_t op2_reactive = *buzzdict_get(vm->reactives,             \
-                                     &(op2->r.value.rid), buzzobj_t);   \
-      buzzdarray_push(op2_reactive->r.value.dependentlist,              \
-               &res->r.value.rid);                                      \
-      res->r.value.value = op2->r.value.value oper op1->r.value.value;  \
-      buzzvm_reactive_expr_t expr = {'oper', op1, op2};                 \
-      buzzdarray_push(res->r.value.expressions, &expr);                  \
-      buzzdict_set(vm->reactives, &(res->r.value.rid), &res);           \
-      buzzvm_push(vm, res);                                             \
+      if(res->r.value.rid == BUZZVM_REACTIVE_INIT_CAPACITY) {           \
+         (vm)->state    = BUZZVM_STATE_ERROR;                           \
+         (vm)->error    = BUZZVM_ERROR_RID_LIMIT;                       \
+         (vm)->errormsg = "Cannot create more reactive variables\n";    \
+         return (vm)->state;                                            \
+      }                                                                 \
+      if(op1->o.type == BUZZTYPE_INT &&                                 \
+              op2->o.type == BUZZTYPE_REACTIVE) {                       \
+         printf("TYPE:::: op1=%ld  op2=%ld\n",op2->o.type, buzzdict_get((vm)->reactives,         \
+                                      &(ad), buzzobj_t));\
+         // TODO: variable getting deleted
+         buzzobj_t op_reactive = *buzzdict_get((vm)->reactives,         \
+                                      &(op2->r.value.rid), buzzobj_t);  \
+         printf("bef reassign\n");\
+         buzzdarray_push(op_reactive->r.value.dependentlist,            \
+                 &(res->r.value.rid));                                  \
+      }                                                                 \
+      else if(op1->o.type == BUZZTYPE_REACTIVE &&                       \
+              op2->o.type == BUZZTYPE_INT) {                            \
+         buzzobj_t op_reactive = *buzzdict_get((vm)->reactives,         \
+                                      &(op1->r.value.rid), buzzobj_t);  \
+         buzzdarray_push(op_reactive->r.value.dependentlist,            \
+                 &(res->r.value.rid));                                  \
+      }                                                                 \
+      else if(op1->o.type == BUZZTYPE_REACTIVE &&                       \
+              op2->o.type == BUZZTYPE_REACTIVE) {                       \
+         buzzobj_t op1_reactive = *buzzdict_get((vm)->reactives,        \
+                                      &(op1->r.value.rid), buzzobj_t);  \
+         buzzdarray_push(op1_reactive->r.value.dependentlist,           \
+                                      &res->r.value.rid);               \
+         buzzobj_t op2_reactive = *buzzdict_get((vm)->reactives,        \
+                                      &(op2->r.value.rid), buzzobj_t);  \
+         buzzdarray_push(op2_reactive->r.value.dependentlist,           \
+                                      &res->r.value.rid);               \
+      }                                                                 \
+      buzzvm_react_expr_t exprn = {*#oper, op1, op2};                   \
+      buzzdarray_push(res->r.value.expressions, &exprn);                \
+      buzzdict_set((vm)->reactives, &res->r.value.rid, &res);           \
+                                                                        \
+      /* Calculate value by looping through all expressions */          \
+      for (size_t i = 0;                                                \
+                     i < buzzdarray_size(res->r.value.expressions);     \
+                     i++) {                                             \
+         const buzzvm_react_expr_t *expr =                              \
+                     &buzzdarray_get(res->r.value.expressions, i,       \
+                     buzzvm_react_expr_t);                              \
+         int val1 = 0;                                                  \
+         if(expr->op1->o.type == BUZZTYPE_REACTIVE) {                   \
+            val1 = (*buzzdict_get((vm)->reactives,                      \
+                        &(expr->op1->r.value.rid), buzzobj_t))          \
+                        ->r.value.value;                                \
+         } else if (expr->op1->o.type == BUZZTYPE_INT) {                \
+            val1 = expr->op1->i.value;                                  \
+         }                                                              \
+         int val2 = 0;                                                  \
+         if(expr->op2->o.type == BUZZTYPE_REACTIVE) {                   \
+            val2 = (*buzzdict_get((vm)->reactives,                      \
+                        &(expr->op2->r.value.rid), buzzobj_t))          \
+                        ->r.value.value;                                \
+         } else if (expr->op2->o.type == BUZZTYPE_INT) {                \
+            val2 = expr->op2->i.value;                                  \
+         }                                                              \
+         switch (expr->optr) {                                          \
+         case '+':                                                      \
+            res->r.value.value = val2 + val1;                           \
+            break;                                                      \
+         case '-':                                                      \
+            res->r.value.value = val2 - val1;                           \
+            break;                                                      \
+         case '*':                                                      \
+            res->r.value.value = val2 * val1;                           \
+            break;                                                      \
+         case '/':                                                      \
+            res->r.value.value = val2 / val1;                           \
+            break;                                                      \
+         }                                                              \
+      }                                                                 \
+                                                                        \
+      buzzvm_push((vm), res);                                           \
    }                                                                    \
    return (vm)->state;
 
@@ -1331,6 +1371,7 @@ uint32_t buzzvm_reactive_get_new_rid(buzzvm_t vm) {
 
       new_rid += 1;
    }
+   return BUZZVM_REACTIVE_INIT_CAPACITY;
 }
 
 /****************************************/
@@ -1341,9 +1382,15 @@ buzzvm_state buzzvm_pushr(buzzvm_t vm, int32_t value) {
    o->r.value.value = value;
    o->r.value.rid = buzzvm_reactive_get_new_rid(vm);
    
-   buzzdict_set(vm->reactives, &(o->r.value.rid), &o);
+   if(o->r.value.rid == BUZZVM_REACTIVE_INIT_CAPACITY) {
+      vm->state    = BUZZVM_STATE_ERROR;
+      vm->error    = BUZZVM_ERROR_RID_LIMIT;
+      vm->errormsg = "Cannot create more reactive variables\n";
+   } else {
+      buzzdict_set(vm->reactives, &(o->r.value.rid), &o);
 
-   buzzvm_push(vm, o);
+      buzzvm_push(vm, o);
+   }
    return vm->state;
 }
 
