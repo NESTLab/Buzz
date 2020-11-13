@@ -181,6 +181,8 @@ extern "C" {
       buzzdarray_t lsymts;
       /* reactive variable table list */
       buzzdict_t reactives;
+      /* gsyms to reactive variable map */
+      buzzdict_t gsyms_to_reactives;
       /* Global symbols */
       buzzdict_t gsyms;
       /* Strings */

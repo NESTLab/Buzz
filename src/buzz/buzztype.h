@@ -105,7 +105,7 @@ extern "C" {
          uint8_t iserror;       // Flag for error state
          buzzdarray_t expressions;  // array of expressions to calculate value
          buzzdarray_t fptrlist;    // array of closures to call on change
-         buzzdarray_t dependentlist; // array of next reactives
+         buzzdarray_t dependentlist; // array of next reactive
       } value;
    } buzzreactive_t;
 

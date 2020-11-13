@@ -123,46 +123,7 @@ static uint16_t SWARM_BROADCAST_PERIOD = 10;
       buzzvm_react_expr_t exprn = {*#oper, op1, op2};                   \
       buzzdarray_push(res->r.value.expressions, &exprn);                \
       buzzdict_set((vm)->reactives, &res->r.value.rid, &res);           \
-                                                                        \
-      /* Calculate value by looping through all expressions */          \
-      for (size_t i = 0;                                                \
-                     i < buzzdarray_size(res->r.value.expressions);     \
-                     i++) {                                             \
-         const buzzvm_react_expr_t *expr =                              \
-                     &buzzdarray_get(res->r.value.expressions, i,       \
-                     buzzvm_react_expr_t);                              \
-         int val1 = 0;                                                  \
-         if(expr->op1->o.type == BUZZTYPE_REACTIVE) {                   \
-            val1 = (*buzzdict_get((vm)->reactives,                      \
-                        &(expr->op1->r.value.rid), buzzobj_t))          \
-                        ->r.value.value;                                \
-         } else if (expr->op1->o.type == BUZZTYPE_INT) {                \
-            val1 = expr->op1->i.value;                                  \
-         }                                                              \
-         int val2 = 0;                                                  \
-         if(expr->op2->o.type == BUZZTYPE_REACTIVE) {                   \
-            val2 = (*buzzdict_get((vm)->reactives,                      \
-                        &(expr->op2->r.value.rid), buzzobj_t))          \
-                        ->r.value.value;                                \
-         } else if (expr->op2->o.type == BUZZTYPE_INT) {                \
-            val2 = expr->op2->i.value;                                  \
-         }                                                              \
-         switch (expr->optr) {                                          \
-         case '+':                                                      \
-            res->r.value.value = val2 + val1;                           \
-            break;                                                      \
-         case '-':                                                      \
-            res->r.value.value = val2 - val1;                           \
-            break;                                                      \
-         case '*':                                                      \
-            res->r.value.value = val2 * val1;                           \
-            break;                                                      \
-         case '/':                                                      \
-            res->r.value.value = val2 / val1;                           \
-            break;                                                      \
-         }                                                              \
-      }                                                                 \
-                                                                        \
+      buzzvm_recalculate_reactive(vm, res);                             \
       buzzvm_push((vm), res);                                           \
    }                                                                    \
    return (vm)->state;
@@ -633,8 +594,15 @@ buzzvm_t buzzvm_new(uint16_t robot) {
 
    /* Create reactive variable tables */
    vm->reactives = buzzdict_new(BUZZVM_REACTIVE_INIT_CAPACITY,
-                            sizeof(int16_t),
+                            sizeof(int32_t),
                             sizeof(buzzobj_t),
+                            buzzdict_int32keyhash,
+                            buzzdict_int32keycmp,
+                            NULL);
+   
+   vm->gsyms_to_reactives = buzzdict_new(BUZZVM_REACTIVE_INIT_CAPACITY,
+                            sizeof(int32_t),
+                            sizeof(int32_t),
                             buzzdict_int32keyhash,
                             buzzdict_int32keycmp,
                             NULL);
@@ -699,6 +667,8 @@ void buzzvm_destroy(buzzvm_t* vm) {
    buzzdarray_destroy(&(*vm)->lsymts);
    /* Get rid of the reactive variable table */
    buzzdict_destroy(&(*vm)->reactives);
+   /* Get rid of the gsyms to reactive variable map */
+   buzzdict_destroy(&(*vm)->gsyms_to_reactives);
    /* Get rid of the stack */
    buzzdarray_destroy(&(*vm)->stacks);
    /* Get rid of the heap */
@@ -1373,6 +1343,61 @@ uint32_t buzzvm_reactive_get_new_rid(buzzvm_t vm) {
 /****************************************/
 /****************************************/
 
+void buzzvm_recalculate_reactive(buzzvm_t vm, buzzobj_t reactv){
+   /* Calculate value by looping through all expressions */
+   for (size_t i = 0; i < buzzdarray_size(reactv->r.value.expressions);
+                                                                     i++) {
+      const buzzvm_react_expr_t *expr =
+                     &buzzdarray_get(reactv->r.value.expressions, i,
+                     buzzvm_react_expr_t);
+      int val1 = 0;
+      if(expr->op1->o.type == BUZZTYPE_REACTIVE) {
+         val1 = (*buzzdict_get((vm)->reactives,
+                     &(expr->op1->r.value.rid), buzzobj_t))->r.value.value;
+      } else if (expr->op1->o.type == BUZZTYPE_INT) {
+         val1 = expr->op1->i.value;
+      }
+      int val2 = 0;
+      if(expr->op2->o.type == BUZZTYPE_REACTIVE) {
+         val2 = (*buzzdict_get((vm)->reactives,
+                     &(expr->op2->r.value.rid), buzzobj_t))
+                     ->r.value.value;
+      } else if (expr->op2->o.type == BUZZTYPE_INT) {
+         val2 = expr->op2->i.value;
+      }
+
+      switch (expr->optr) {
+      case '+':
+         reactv->r.value.value = val2 + val1;
+         break;
+      case '-':
+         reactv->r.value.value = val2 - val1;
+         break;
+      case '*':
+         reactv->r.value.value = val2 * val1;
+         break;
+      case '/':
+         reactv->r.value.value = val2 / val1;
+         break;
+      }
+   }
+}
+
+/****************************************/
+/****************************************/
+
+void buzzvm_recalculate_reactive_tree(uint32_t pos, void* data, void* params) {
+   buzzvm_t vm = (buzzvm_t)params;
+   const buzzobj_t *reactv_ptr = buzzdict_get(vm->reactives, (uint32_t*)data, buzzobj_t);
+
+   buzzvm_recalculate_reactive(vm, *reactv_ptr);
+   buzzdarray_foreach((*reactv_ptr)->r.value.dependentlist,
+                     buzzvm_recalculate_reactive_tree, vm);
+}
+
+/****************************************/
+/****************************************/
+
 buzzvm_state buzzvm_pushr(buzzvm_t vm, int32_t value) {
    buzzobj_t o = buzzheap_newobj(vm, BUZZTYPE_REACTIVE);
    o->r.value.value = value;
@@ -1499,11 +1524,36 @@ buzzvm_state buzzvm_gstore(buzzvm_t vm) {
    buzzobj_t o = buzzvm_stack_at((vm), 1);
    buzzvm_pop(vm);
    buzzvm_pop(vm);
-   buzzdict_set((vm)->gsyms, &(str->s.value.sid), &o);
+   
+   if(o->o.type == BUZZTYPE_REACTIVE) {
+      buzzdict_set((vm)->gsyms_to_reactives, &(str->s.value.sid), &(o->r.value.rid));
+   } else {
+      if(o->o.type == BUZZTYPE_INT) { // Only testing ints for now
+         const uint32_t* rid_ptr = buzzdict_get((vm)->gsyms_to_reactives,
+                     &(str->s.value.sid), uint32_t);
 
-   // if(o->o.type == BUZZTYPE_REACTIVE) {
-      printf("[%s] TYPE: [%d]\n", str->s.value.str, o->o.type);
-   // }
+         /* If Reactive exists */
+         if(rid_ptr) {
+            buzzobj_t stored_reactive = *buzzdict_get((vm)->reactives, rid_ptr, buzzobj_t);
+
+            stored_reactive->r.value.value = o->i.value;//INT
+
+            buzzdarray_clear(stored_reactive->r.value.expressions, 1);
+            
+            buzzdict_set((vm)->reactives, rid_ptr, &stored_reactive);
+            
+            //TODO: loop through all reactives to find this `rid` in dependentlist
+            // and removing it
+   
+            buzzdarray_foreach(stored_reactive->r.value.dependentlist,
+                     buzzvm_recalculate_reactive_tree, vm);
+            
+            o = stored_reactive;
+         }
+      }
+   }
+
+   buzzdict_set((vm)->gsyms, &(str->s.value.sid), &o);
 
    return BUZZVM_STATE_READY;
 }

@@ -102,6 +102,16 @@ buzzobj_t buzzheap_clone(buzzvm_t vm, const buzzobj_t o) {
          x->c.value.isnative = o->c.value.isnative;
          return x;
       }
+      case BUZZTYPE_REACTIVE: {
+         x->r.value.rid = o->r.value.rid;
+         x->r.value.value = o->r.value.value;
+         x->r.value.isdone = o->r.value.isdone;
+         x->r.value.iserror = o->r.value.iserror;
+         x->r.value.fptrlist = buzzdarray_clone(o->r.value.fptrlist);
+         x->r.value.expressions = buzzdarray_clone(o->r.value.expressions);
+         x->r.value.dependentlist = buzzdarray_clone(o->r.value.dependentlist);
+         return x;
+      }
       case BUZZTYPE_TABLE: {
          buzzdict_t orig = o->t.value;
          x->t.value = buzzdict_new(orig->num_buckets,
@@ -215,6 +225,8 @@ void buzzheap_gc(struct buzzvm_s* vm) {
    buzzdarray_foreach(vm->lsymts, buzzheap_lsyms_mark, vm);
    /* Go through all the objects in the reactives and mark them */
    buzzdict_foreach(vm->reactives, buzzheap_reactive_mark, vm);
+   /* Go through all the objects in the gsyms to reactives map and mark them */
+   buzzdict_foreach(vm->gsyms_to_reactives, buzzheap_reactive_mark, vm);
    /* Go through all the objects in the virtual stigmergy and mark them */
    buzzdict_foreach(vm->vstigs, buzzheap_vstig_mark, vm);
    /* Go through all the objects in the listeners and mark them */
