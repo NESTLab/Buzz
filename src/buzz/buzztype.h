@@ -279,6 +279,7 @@ extern "C" {
 #define buzzobj_istable(OBJ) ((OBJ)->o.type == BUZZTYPE_TABLE)
 #define buzzobj_isclosure(OBJ) ((OBJ)->o.type == BUZZTYPE_CLOSURE)
 #define buzzobj_isuserdata(OBJ) ((OBJ)->o.type == BUZZTYPE_USERDATA)
+#define buzzobj_isreactive(OBJ) ((OBJ)->o.type == BUZZTYPE_REACTIVE)
 
 #define buzzobj_getint(OBJ) ((OBJ)->i.value)
 #define buzzobj_getfloat(OBJ) ((OBJ)->f.value)

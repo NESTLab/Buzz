@@ -97,12 +97,8 @@ static uint16_t SWARM_BROADCAST_PERIOD = 10;
       }                                                                 \
       if(op1->o.type == BUZZTYPE_INT &&                                 \
               op2->o.type == BUZZTYPE_REACTIVE) {                       \
-         printf("TYPE:::: op1=%ld  op2=%ld\n",op2->o.type, buzzdict_get((vm)->reactives,         \
-                                      &(ad), buzzobj_t));\
-         // TODO: variable getting deleted
          buzzobj_t op_reactive = *buzzdict_get((vm)->reactives,         \
                                       &(op2->r.value.rid), buzzobj_t);  \
-         printf("bef reassign\n");\
          buzzdarray_push(op_reactive->r.value.dependentlist,            \
                  &(res->r.value.rid));                                  \
       }                                                                 \
@@ -1504,6 +1500,11 @@ buzzvm_state buzzvm_gstore(buzzvm_t vm) {
    buzzvm_pop(vm);
    buzzvm_pop(vm);
    buzzdict_set((vm)->gsyms, &(str->s.value.sid), &o);
+
+   // if(o->o.type == BUZZTYPE_REACTIVE) {
+      printf("[%s] TYPE: [%d]\n", str->s.value.str, o->o.type);
+   // }
+
    return BUZZVM_STATE_READY;
 }
 
