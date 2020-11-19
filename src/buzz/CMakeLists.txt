@@ -20,6 +20,7 @@ add_library(buzz SHARED
   buzzinmsg.h buzzinmsg.c
   buzzoutmsg.h buzzoutmsg.c
   buzzvstig.h buzzvstig.c
+  buzzreactive.h buzzreactive.c
   buzzswarm.h buzzswarm.c
   buzzneighbors.h buzzneighbors.c
   buzzstrman.h buzzstrman.c

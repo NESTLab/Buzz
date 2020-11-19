@@ -99,13 +99,13 @@ extern "C" {
       uint16_t type;
       uint16_t marker;
       struct {
-         uint32_t rid;          // The reactive id
-         uint32_t value;        // The reactive value
-         uint8_t isdone;        // Flag for done state
-         uint8_t iserror;       // Flag for error state
-         buzzdarray_t expressions;  // array of expressions to calculate value
-         buzzdarray_t fptrlist;    // array of closures to call on change
-         buzzdarray_t dependentlist; // array of next reactive
+         uint32_t rid;                 // The reactive id
+         uint32_t value;               // The reactive value
+         uint8_t isdone;               // flag for done state
+         uint8_t iserror;              // flag for error state
+         buzzdarray_t expressions;     // array of expressions to calculate value
+         buzzdarray_t fptrlist;        // array of closures to call on change
+         buzzdarray_t dependentlist;   // array of next reactive
       } value;
    } buzzreactive_t;
 

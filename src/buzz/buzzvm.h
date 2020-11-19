@@ -6,6 +6,7 @@
 #include <buzz/buzzinmsg.h>
 #include <buzz/buzzoutmsg.h>
 #include <buzz/buzzvstig.h>
+#include <buzz/buzzreactive.h>
 #include <buzz/buzzswarm.h>
 #include <buzz/buzzneighbors.h>
 
