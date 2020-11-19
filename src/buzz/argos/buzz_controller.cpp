@@ -54,6 +54,10 @@ int BuzzLOG (buzzvm_t vm) {
          case BUZZTYPE_STRING:
             LOG << o->s.value.str;
             break;
+         case BUZZTYPE_REACTIVE:
+            LOG << "[reactive @" << o->r.value.rid 
+                                 << "] " << o->r.value.value;
+            break;
          case BUZZTYPE_USERDATA:
             LOG << "[userdata @" << o->u.value << "]";
             break;
@@ -125,6 +129,10 @@ int BuzzDebugPrint(buzzvm_t vm) {
             break;
          case BUZZTYPE_STRING:
             oss << o->s.value.str;
+            break;
+         case BUZZTYPE_REACTIVE:
+            oss << "[reactive @" << o->r.value.rid 
+                                 << "] " << o->r.value.value;
             break;
          case BUZZTYPE_USERDATA:
             oss << "[userdata @" << o->u.value << "]";

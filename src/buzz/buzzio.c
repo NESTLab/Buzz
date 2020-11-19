@@ -227,6 +227,9 @@ int buzzio_fwrite(buzzvm_t vm) {
          case BUZZTYPE_STRING:
             err = fprintf(f, "%s", o->s.value.str);
             break;
+         case BUZZTYPE_REACTIVE:
+            err = fprintf(f, "[reactive @%d] %d", o->r.value.rid, o->r.value.value);
+            break;
          case BUZZTYPE_USERDATA:
             err = fprintf(f, "[userdata @%p]", o->u.value);
             break;

@@ -229,6 +229,9 @@ void buzzvm_dump(buzzvm_t vm) {
                   fprintf(stderr, "[c-closure] %d\n", o->c.value.ref);
                }
                break;
+            case BUZZTYPE_REACTIVE:
+               fprintf(stderr, "[reactive @%d] %d\n", o->r.value.rid, o->r.value.value);
+               break;
             case BUZZTYPE_STRING:
                fprintf(stderr, "[string] %d:'%s'\n", o->s.value.sid, o->s.value.str);
                break;

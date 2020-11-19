@@ -73,6 +73,11 @@ void buzzobj_destroy(buzzobj_t* o) {
    else if((*o)->o.type == BUZZTYPE_CLOSURE) {
       buzzdarray_destroy(&((*o)->c.value.actrec));
    }
+   else if((*o)->o.type == BUZZTYPE_REACTIVE) {
+      buzzdarray_destroy(&((*o)->r.value.expressions));
+      buzzdarray_destroy(&((*o)->r.value.fptrlist));
+      buzzdarray_destroy(&((*o)->r.value.dependentlist));
+   }
    free(*o);
    *o = NULL;
 }
@@ -103,6 +108,9 @@ uint32_t buzzobj_hash(const buzzobj_t o) {
          uint32_t p = (uintptr_t)(o->u.value);
          return buzzdict_uint32keyhash(&p);
       }
+      case BUZZTYPE_REACTIVE: {
+         return buzzdict_uint32keyhash(&(o->r.value.rid));
+      }
       case BUZZTYPE_CLOSURE:
       default:
          fprintf(stderr, "[BUG] %s:%d: Hash for Buzz object type %d\n", __FILE__, __LINE__, o->o.type);
@@ -128,6 +136,7 @@ int buzzobj_eq(const buzzobj_t a,
          return((a->c.value.isnative == b->c.value.isnative) &&
                 (a->c.value.ref      == b->c.value.ref)      &&
                 (a->c.value.actrec   == b->c.value.actrec));
+      case BUZZTYPE_REACTIVE: return (a->r.value.value == b->r.value.value);
       case BUZZTYPE_USERDATA: return ((uintptr_t)(a->u.value) == (uintptr_t)(b->u.value));
       default:
          fprintf(stderr, "[BUG] %s:%d: Equality test between wrong Buzz objects types %d and %d\n", __FILE__, __LINE__, a->o.type, b->o.type);
