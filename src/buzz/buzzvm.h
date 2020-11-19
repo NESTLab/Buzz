@@ -44,7 +44,8 @@ extern "C" {
       BUZZVM_ERROR_FLIST,    // Function call id out of range
       BUZZVM_ERROR_TYPE,     // Type mismatch
       BUZZVM_ERROR_STRING,   // Unknown string id
-      BUZZVM_ERROR_SWARM     // Unknown swarm id
+      BUZZVM_ERROR_SWARM,    // Unknown swarm id
+      BUZZVM_ERROR_RID_LIMIT // Reactive RID creation limit reached
    } buzzvm_error;
    extern const char *buzzvm_error_desc[];
 
@@ -100,6 +101,7 @@ extern "C" {
       BUZZVM_INSTR_PUSHS,    // Push string constant onto stack
       BUZZVM_INSTR_PUSHCN,   // Push native closure onto stack
       BUZZVM_INSTR_PUSHCC,   // Push c-function closure onto stack
+      BUZZVM_INSTR_PUSHR,   // Push reactive variable onto stack
       BUZZVM_INSTR_PUSHL,    // Push native closure lambda onto stack
       BUZZVM_INSTR_LLOAD,    // Push local variable at given position
       BUZZVM_INSTR_LSTORE,   // Store stack-top value into local variable at given position, pop operand
@@ -117,6 +119,25 @@ extern "C" {
     */
    struct buzzvm_s;
    typedef int (*buzzvm_funp)(struct buzzvm_s* vm);
+
+   /*
+    * closure pointer for REACTIVE_ON_NEXT.
+    * @param void.
+    * @return void.
+    */
+   typedef void (*buzzvm_reactnext_funp)(void);
+
+   /*
+    * Data for reactive expressions
+    */      
+   struct buzzvm_reactive_expr_s {
+      /* Operator */
+      char optr;
+      buzzobj_t op1;
+      buzzobj_t op2;
+   };
+   typedef struct buzzvm_reactive_expr_s buzzvm_react_expr_t;
+
 
    /*
     * Data for local symbols
@@ -158,6 +179,10 @@ extern "C" {
       buzzvm_lsyms_t lsyms;
       /* Local variable table list */
       buzzdarray_t lsymts;
+      /* reactive variable table list */
+      buzzdict_t reactives;
+      /* gsyms to reactive variable map */
+      buzzdict_t gsyms_to_reactives;
       /* Global symbols */
       buzzdict_t gsyms;
       /* Strings */
@@ -414,6 +439,17 @@ extern "C" {
     * @return The VM state.
     */
    extern buzzvm_state buzzvm_pushs(buzzvm_t vm, uint16_t strid);
+
+   /*
+    * Pushes a reactive variable on the stack.
+    * Internally checks whether the operation is valid.
+    * This function is designed to be used within int-returning functions such as
+    * BuzzVM hook functions or buzzvm_step().
+    * @param vm The VM data.
+    * @param v The value.
+    * @return The VM state.
+    */
+   extern buzzvm_state buzzvm_pushr(buzzvm_t vm, int32_t v);
 
    /*
     * Pushes a lambda native closure on the stack.

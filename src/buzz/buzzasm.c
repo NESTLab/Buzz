@@ -297,6 +297,7 @@ int buzz_asm(const char* fname,
       i_arg_instr(BUZZVM_INSTR_PUSHS);
       i_arg_instr(BUZZVM_INSTR_PUSHCN);
       i_arg_instr(BUZZVM_INSTR_PUSHCC);
+      i_arg_instr(BUZZVM_INSTR_PUSHR);
       i_arg_instr(BUZZVM_INSTR_PUSHL);
       i_arg_instr(BUZZVM_INSTR_LLOAD);
       i_arg_instr(BUZZVM_INSTR_LSTORE);

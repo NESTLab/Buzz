@@ -15,6 +15,7 @@
 #define BUZZTYPE_TABLE    4
 #define BUZZTYPE_CLOSURE  5
 #define BUZZTYPE_USERDATA 6
+#define BUZZTYPE_REACTIVE 7
 
 #ifdef __cplusplus
 extern "C" {
@@ -92,6 +93,24 @@ extern "C" {
    } buzzuserdata_t;
 
    /*
+    * Reactive
+    */
+   typedef struct {
+      uint16_t type;
+      uint16_t marker;
+      struct {
+         uint32_t rid;          // The reactive id
+         uint32_t value;        // The reactive value
+         uint8_t isdone;        // Flag for done state
+         uint8_t iserror;       // Flag for error state
+         buzzdarray_t expressions;  // array of expressions to calculate value
+         buzzdarray_t fptrlist;    // array of closures to call on change
+         buzzdarray_t dependentlist; // array of next reactive
+      } value;
+   } buzzreactive_t;
+
+
+   /*
     * A handle for a object
     */
    union buzzobj_u {
@@ -105,6 +124,7 @@ extern "C" {
       buzzstring_t   s;    // as string
       buzztable_t    t;    // as table
       buzzclosure_t  c;    // as closure
+      buzzreactive_t r;    // as reactive
       buzzuserdata_t u;    // as user data
    };
    typedef union buzzobj_u* buzzobj_t;
@@ -259,6 +279,7 @@ extern "C" {
 #define buzzobj_istable(OBJ) ((OBJ)->o.type == BUZZTYPE_TABLE)
 #define buzzobj_isclosure(OBJ) ((OBJ)->o.type == BUZZTYPE_CLOSURE)
 #define buzzobj_isuserdata(OBJ) ((OBJ)->o.type == BUZZTYPE_USERDATA)
+#define buzzobj_isreactive(OBJ) ((OBJ)->o.type == BUZZTYPE_REACTIVE)
 
 #define buzzobj_getint(OBJ) ((OBJ)->i.value)
 #define buzzobj_getfloat(OBJ) ((OBJ)->f.value)
