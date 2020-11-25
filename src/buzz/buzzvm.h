@@ -102,7 +102,7 @@ extern "C" {
       BUZZVM_INSTR_PUSHS,    // Push string constant onto stack
       BUZZVM_INSTR_PUSHCN,   // Push native closure onto stack
       BUZZVM_INSTR_PUSHCC,   // Push c-function closure onto stack
-      BUZZVM_INSTR_PUSHR,   // Push reactive variable onto stack
+      BUZZVM_INSTR_PUSHR,    // Push reactive variable onto stack
       BUZZVM_INSTR_PUSHL,    // Push native closure lambda onto stack
       BUZZVM_INSTR_LLOAD,    // Push local variable at given position
       BUZZVM_INSTR_LSTORE,   // Store stack-top value into local variable at given position, pop operand
@@ -120,13 +120,6 @@ extern "C" {
     */
    struct buzzvm_s;
    typedef int (*buzzvm_funp)(struct buzzvm_s* vm);
-
-   /*
-    * closure pointer for REACTIVE_ON_NEXT.
-    * @param void.
-    * @return void.
-    */
-   typedef void (*buzzvm_reactnext_funp)(void);
 
    /*
     * Data for reactive expressions

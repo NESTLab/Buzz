@@ -11,6 +11,11 @@
 - Robots must be capable of arbitrating among different tasks, distributed in space and to be executed in parallel
 - TOTA might be interesting to look into for this
 
+* TODO Improve Reactive variables
+- Add test cases
+- Test reactive as value for a table
+- Add mechanism to serialize and deserialize reactive variables
+
 * TODO Look into mesh networks
 - How to integrate with Buzz communication?
 - Can we use a mesh network as a fallback mechanism for Buzz?

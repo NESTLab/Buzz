@@ -774,6 +774,8 @@ int buzzvm_set_bcode(buzzvm_t vm,
    buzzobj_register(vm);
    /* Register stigmergy methods */
    buzzvstig_register(vm);
+   /* Register reactive methods */
+   buzzreactive_register(vm);
    /* Register swarm methods */
    buzzswarm_register(vm);
    /* Register math methods */
