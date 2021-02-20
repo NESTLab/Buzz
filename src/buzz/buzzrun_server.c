@@ -43,13 +43,14 @@ void check_clients(int server_socket, buzzdarray_t clients) {
     for (int64_t i = 0; i < buzzdarray_size(clients); ++i) {
         const int client_socket = buzzdarray_get(clients, i, int);
 
-        int read_size;
+        ssize_t read_size;
         int BUFF_SIZE = 1024;
         char buf[BUFF_SIZE];
 
         /* Check if any data is available from client */
         while ((read_size = recv(client_socket, buf, BUFF_SIZE, 0)) > 0) {
-            printf("Received: %s\n", buf);
+            buf[read_size] = '\0';
+            printf("Received [%ld]: %s\n", read_size, buf);
         }
 
         if (read_size == 0) {
@@ -70,10 +71,31 @@ void send_data(buzzdarray_t clients, char *data, size_t size) {
     }
 }
 
+void send_from_stdin(buzzdarray_t clients) {
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(STDIN_FILENO, &readfds);
+    fd_set savefds = readfds;
+
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 0;
+
+    char message[50];
+
+    if (select(1, &readfds, NULL, NULL, &timeout)) {
+        scanf("%s", message);
+        printf("Sending message [%ld]: %s\n", strlen(message), message);
+        send_data(clients, message, strlen(message));
+    }
+
+    readfds = savefds;
+}
+
 int main(int argc, char *argv[]) {
     int server_socket;
-
     struct sockaddr_in server;
+
     /* Prepare the sockaddr_in structure */
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
@@ -82,10 +104,12 @@ int main(int argc, char *argv[]) {
     /* Configure signals */
     if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
         perror("Cannot configure to ignore SIGPIPE");
-        fflush(stderr);
+        exit(1);
     }
+
     if (signal(SIGINT, interrupt_handler) == SIG_ERR) {
         perror("Cannot configure to listen to interrupt signals");
+        exit(1);
     }
 
     buzzdarray_t clients = buzzdarray_new(10, sizeof(int), NULL);
@@ -134,21 +158,14 @@ int main(int argc, char *argv[]) {
     while (!stop_signal) {
         check_clients(server_socket, clients);
 
-        /* demo usecase, to send client size to all the clients */
-        int64_t network_size = buzzdarray_size(clients);
-        if (network_size > 0) {
-            char txt[20];
-            int len = sprintf(txt, "Network size: %ld \n", network_size);
+        send_from_stdin(clients);
 
-            send_data(clients, txt, len);
-        }
-
-        /*=================== Loop rate management code ================*/
+        /*=================== Loop rate management ================*/
         clock_gettime(CLOCK_MONOTONIC, &ts_end);
         ts_diff.tv_sec = (long)MAX_LOOP_TIME_INTEGRAL - (ts_end.tv_sec - ts_start.tv_sec);
         ts_diff.tv_nsec = (long)MAX_LOOP_TIME_FRACTIONAL_NANO - (ts_end.tv_nsec - ts_start.tv_nsec);
 
-        /* Sleep for calculated time */
+        /* Sleep for the calculated time */
         nanosleep(&ts_diff, NULL);
         clock_gettime(CLOCK_MONOTONIC, &ts_start);
     }
