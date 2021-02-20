@@ -69,6 +69,17 @@ target_link_libraries(bzzrun buzz buzzdbg)
 install(TARGETS bzzrun RUNTIME DESTINATION bin)
 
 #
+# Compile bzzrun_server
+#
+add_executable(bzzrun_server buzzrun_server.c)
+target_link_libraries(bzzrun_server buzz buzzdbg)
+install(TARGETS bzzrun_server RUNTIME DESTINATION bin)
+
+
+add_executable(bzzrun_client buzzrun_client.c)
+target_link_libraries(bzzrun_client buzz buzzdbg)
+install(TARGETS bzzrun_client RUNTIME DESTINATION bin)
+#
 # Compile ARGoS-related stuff
 #
 if(ARGOS_FOUND)
