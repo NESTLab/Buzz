@@ -356,6 +356,9 @@ int main(int argc, char** argv) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "log", 1));
    buzzvm_pushcc(vm, buzzvm_function_register(vm, print));
    buzzvm_gstore(vm);
+
+   //TODO: register other functions like controller, print, clear, debug, 
+
    /* Run byte code */
    do if(trace) buzzdebug_stack_dump(vm, 1, stdout);
    while(buzzvm_step(vm) == BUZZVM_STATE_READY);
