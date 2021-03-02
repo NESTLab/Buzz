@@ -2,6 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <unistd.h>
+
+
+/* time duration for each cycle in the loop (usually 0.1 seconds) */
+struct timespec LOOP_TIME_STEP = { 0, 0.1 * 1e9}; // 0.1 seconds
 
 #define check_arg(arg)                                                                 \
    if(strcmp(arg, "--trace") == 0) {                                                   \
@@ -32,6 +38,22 @@
                vm->oldpc,                                                              \
                vm->errormsg);                                                          \
    }
+
+/**
+ * @fn timespec_diff(struct timespec *, struct timespec *, struct timespec *)
+ * @brief Compute the diff of two timespecs, that is a - b = result.
+ * @param a the minuend
+ * @param b the subtrahend
+ * @param result a - b
+ */
+void timespec_diff(struct timespec *a, struct timespec *b, struct timespec *result) {
+    result->tv_sec  = a->tv_sec  - b->tv_sec;
+    result->tv_nsec = a->tv_nsec - b->tv_nsec;
+    if (result->tv_nsec < 0) {
+        --result->tv_sec;
+        result->tv_nsec += 1000000000L;
+    }
+}
 
 void usage(const char* path, int status) {
    fprintf(stderr, "Usage:\n\t%s [--trace] [--loop] <file.bo> <file.bdb>\n\n", path);
@@ -154,6 +176,10 @@ int main(int argc, char** argv) {
          print_debug_info(vm);
          retval = 1;
       } else {
+         struct timespec startTime, endTime, deltaTime, sleepTime;
+         clock_gettime(CLOCK_MONOTONIC_RAW, &startTime);
+
+         /* Infinite Loop */
          while(vm->state == BUZZVM_STATE_READY) {
             // ProcessInMsgs();
             if(trace) buzzdebug_stack_dump(vm, 1, stdout);
@@ -166,6 +192,16 @@ int main(int argc, char** argv) {
             /* Remove useless return value from stack */
             buzzvm_pop(vm);
             // ProcessOutMsgs();
+
+            /* Loop time management */
+            clock_gettime(CLOCK_MONOTONIC_RAW, &endTime);
+            /* Calculate sleep time */
+            timespec_diff(&endTime, &startTime, &deltaTime);
+            timespec_diff(&LOOP_TIME_STEP, &deltaTime, &sleepTime);
+            /* Sleep */
+            // printf("Sleeps for: %ld.%.9ld\n", sleepTime.tv_sec, sleepTime.tv_nsec);
+            nanosleep(&sleepTime, NULL);
+            clock_gettime(CLOCK_MONOTONIC_RAW, &startTime);
          }
       }
    }
