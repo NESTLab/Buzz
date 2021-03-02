@@ -3,8 +3,38 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define check_arg(arg)                                                                 \
+   if(strcmp(arg, "--trace") == 0) {                                                   \
+      trace = 1;                                                                       \
+   } else if(strcmp(arg, "--loop") == 0) {                                             \
+      loop = 1;                                                                        \
+   }                                                                                   \
+   else {                                                                              \
+      fprintf(stderr, "error: %s: unrecognized option '%s'\n", argv[0], arg);          \
+      usage(argv[0], 1);                                                               \
+   }
+
+#define print_debug_info(vm)                                                           \
+   const buzzdebug_entry_t* dbg = buzzdebug_info_get_fromoffset(dbg_buf, &vm->oldpc);  \
+   if(dbg != NULL) {                                                                   \
+      fprintf(stderr, "%s: execution terminated abnormally at                          \
+               \n\r%s:%" PRIu64 ":%" PRIu64 " : %s\n\n",                               \
+               bcfname,                                                                \
+               (*dbg)->fname,                                                          \
+               (*dbg)->line,                                                           \
+               (*dbg)->col,                                                            \
+               vm->errormsg);                                                          \
+   }                                                                                   \
+   else {                                                                              \
+      fprintf(stderr, "%s: execution terminated abnormally at bytecode offset          \
+               \n\r%d: %s\n\n",                                                        \
+               bcfname,                                                                \
+               vm->oldpc,                                                              \
+               vm->errormsg);                                                          \
+   }
+
 void usage(const char* path, int status) {
-   fprintf(stderr, "Usage:\n\t%s [--trace] <file.bo> <file.bdb>\n\n", path);
+   fprintf(stderr, "Usage:\n\t%s [--trace] [--loop] <file.bo> <file.bdb>\n\n", path);
    exit(status);
 }
 
@@ -53,20 +83,20 @@ int main(int argc, char** argv) {
    char* dbgfname;
    /* Whether or not to show the assembly information */
    int trace = 0;
+   /* Whether or not to run init and loop functions */
+   int loop = 0;
    /* Parse command line */
-   if(argc < 3 || argc > 4) usage(argv[0], 0);
+   if(argc < 3 || argc > 5) usage(argv[0], 0);
    if(argc == 3) {
       bcfname = argv[1];
       dbgfname = argv[2];
-   }
-   else {
-      bcfname = argv[2];
-      dbgfname = argv[3];
-      if(strcmp(argv[1], "--trace") != 0) {
-         fprintf(stderr, "error: %s: unrecognized option '%s'\n", argv[0], argv[1]);
-         usage(argv[0], 1);
+   } else {
+      bcfname = argv[argc - 2];
+      dbgfname = argv[argc - 1];
+      check_arg(argv[1]);
+      if(argc == 5) {
+         check_arg(argv[2]);
       }
-      trace = 1;
    }
    /* Read bytecode and fill in data structure */
    FILE* fd = fopen(bcfname, "rb");
@@ -92,6 +122,9 @@ int main(int argc, char** argv) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "log", 1));
    buzzvm_pushcc(vm, buzzvm_function_register(vm, print));
    buzzvm_gstore(vm);
+
+   //TODO: register other functions like controller, print, clear, debug, 
+
    /* Run byte code */
    do if(trace) buzzdebug_stack_dump(vm, 1, stdout);
    while(buzzvm_step(vm) == BUZZVM_STATE_READY);
@@ -100,30 +133,43 @@ int main(int argc, char** argv) {
    if(vm->state == BUZZVM_STATE_DONE) {
       /* Execution terminated without errors */
       if(trace) buzzdebug_stack_dump(vm, 1, stdout);
-      fprintf(stdout, "%s: execution terminated correctly\n\n",
-              bcfname);
+      if (!loop) { // if not in loop mode, print this
+         fprintf(stdout, "%s: execution terminated correctly\n\n",
+               bcfname);
+      }
       retval = 0;
    }
    else {
       /* Execution terminated with errors */
       if(trace) buzzdebug_stack_dump(vm, 1, stdout);
-      const buzzdebug_entry_t* dbg = buzzdebug_info_get_fromoffset(dbg_buf, &vm->oldpc);
-      if(dbg != NULL) {
-         fprintf(stderr, "%s: execution terminated abnormally at %s:%" PRIu64 ":%" PRIu64 " : %s\n\n",
-                 bcfname,
-                 (*dbg)->fname,
-                 (*dbg)->line,
-                 (*dbg)->col,
-                 vm->errormsg);
-      }
-      else {
-         fprintf(stderr, "%s: execution terminated abnormally at bytecode offset %d: %s\n\n",
-                 bcfname,
-                 vm->oldpc,
-                 vm->errormsg);
-      }
+      /* Print debug info to stderr */
+      print_debug_info(vm);
       retval = 1;
    }
+
+   if (loop) {
+      /* Call the Init() function */
+      if(buzzvm_function_call(vm, "init", 0) != BUZZVM_STATE_READY) {
+         /* Print debug info to stderr */
+         print_debug_info(vm);
+         retval = 1;
+      } else {
+         while(vm->state == BUZZVM_STATE_READY) {
+            // ProcessInMsgs();
+            if(trace) buzzdebug_stack_dump(vm, 1, stdout);
+            if(buzzvm_function_call(vm, "step", 0) != BUZZVM_STATE_READY) {
+               /* Print debug info to stderr */
+               print_debug_info(vm);
+               retval = 1;
+               break;
+            }
+            /* Remove useless return value from stack */
+            buzzvm_pop(vm);
+            // ProcessOutMsgs();
+         }
+      }
+   }
+
    /* Destroy VM */
    free(bcode_buf);
    buzzdebug_destroy(&dbg_buf);
