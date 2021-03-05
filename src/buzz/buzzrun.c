@@ -128,7 +128,7 @@ int print(buzzvm_t vm) {
  * @param vm 
  * @param server_socket 
  */
-void ProcessInMsgs(buzzvm_t vm, int server_socket) {
+void process_in_msgs(buzzvm_t vm, int server_socket) {
     char buff[1024];
     ssize_t bytesRead;
 
@@ -144,8 +144,49 @@ void ProcessInMsgs(buzzvm_t vm, int server_socket) {
  * @param vm 
  * @param server_socket 
  */
-void ProcessOutMsgs(buzzvm_t vm, int server_socket) {
+void process_out_msgs(buzzvm_t vm, int server_socket) {
+   /* Process outgoing messages */
+   buzzvm_process_outmsgs(vm);
+   // /* Send robot id */
+   // write(server_socket, &vm->robot, sizeof(vm->robot));
+   /* Set Server socket to blocking */
+   if (fcntl(server_socket, F_SETFL,  fcntl(server_socket, F_GETFL) & ~(O_NONBLOCK)) < 0) {
+      perror("Cannot configure socket to be in blocking mode");
+      return;
+   }
+   /* Loop through buzzoutmsg queue */
+   do {
+      /* Are there more messages? */
+      if(buzzoutmsg_queue_isempty(vm)) break;
+      /* Get first message */
+      buzzmsg_payload_t m = buzzoutmsg_queue_first(vm);
+      /* Send to server */
+      /* dArray size */
+      write(server_socket, &buzzmsg_payload_size(m), sizeof(buzzmsg_payload_size(m)));
 
+      int64_t total_size = buzzmsg_payload_size(m);
+      ssize_t written = 0;
+      int64_t total_written = 0;
+      
+      /* Loop until all data has been sent */
+      while (total_written < total_size) {
+         written = write(server_socket, (m->data + total_written), total_size - total_written);
+         if(written == -1) {
+            perror("Cannot write to server");
+            stop_signal = 1;
+            return;
+         }
+         total_written += written;
+      }
+      /* Get rid of message */
+      buzzoutmsg_queue_next(vm);
+      buzzmsg_payload_destroy(&m);
+   } while(1);
+   /* Set Server socket back to non-blocking */
+   if (fcntl(server_socket, F_SETFL, fcntl(server_socket, F_GETFL) | O_NONBLOCK) < 0) {
+      perror("Cannot configure socket to be in non-blocking mode");
+      exit(1);
+   }
 }
 
 int main(int argc, char** argv) {
@@ -277,7 +318,7 @@ int main(int argc, char** argv) {
          /* Infinite Loop breaking with interrupts */
          while(vm->state == BUZZVM_STATE_READY && !stop_signal) {
             /* Check for any incoming messages from server and parse */
-            ProcessInMsgs(vm, server_socket);
+            process_in_msgs(vm, server_socket);
             /* If trace is enabled */
             if(trace) buzzdebug_stack_dump(vm, 1, stdout);
             if(buzzvm_function_call(vm, "step", 0) != BUZZVM_STATE_READY) {
@@ -289,7 +330,7 @@ int main(int argc, char** argv) {
             /* Remove useless return value from stack */
             buzzvm_pop(vm);
             /* Check for any outgoing messages and send */
-            ProcessOutMsgs(vm, server_socket);
+            process_out_msgs(vm, server_socket);
 
             /* Loop time management */
             clock_gettime(CLOCK_MONOTONIC_RAW, &endTime);
