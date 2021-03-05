@@ -11,6 +11,8 @@
 #include <time.h>        // timespec, nanosleep, clock_gettime
 #include <unistd.h>      // read, write, close, sleep
 
+#include <string.h>
+
 #define LOOP_RATE 10  // cycles per second
 
 #define MAX_LOOP_TIME (1.0 / LOOP_RATE)
@@ -44,13 +46,13 @@ void check_clients(int server_socket, buzzdarray_t clients) {
         const int client_socket = buzzdarray_get(clients, i, int);
 
         ssize_t read_size;
-        int BUFF_SIZE = 1024;
+        const size_t BUFF_SIZE = 1024 * 1024;
         char buf[BUFF_SIZE];
 
         /* Check if any data is available from client */
         while ((read_size = recv(client_socket, buf, BUFF_SIZE, 0)) > 0) {
             buf[read_size] = '\0';
-            printf("Received [%ld]: %s\n", read_size, buf);
+            printf("Received [%ld bytes]\n", read_size);
         }
 
         if (read_size == 0) {
