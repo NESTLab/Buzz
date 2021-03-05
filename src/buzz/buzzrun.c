@@ -1,7 +1,12 @@
+#include <arpa/inet.h>
 #include <buzz/buzzasm.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -12,8 +17,8 @@ struct timespec LOOP_TIME_STEP = { 0, 0.1 * 1e9}; // 0.1 seconds
 #define check_arg(arg)                                                                 \
    if(strcmp(arg, "--trace") == 0) {                                                   \
       trace = 1;                                                                       \
-   } else if(strcmp(arg, "--loop") == 0) {                                             \
-      loop = 1;                                                                        \
+   } else if(strcmp(arg, "--server") == 0) {                                           \
+      server = 1;                                                                      \
    }                                                                                   \
    else {                                                                              \
       fprintf(stderr, "error: %s: unrecognized option '%s'\n", argv[0], arg);          \
@@ -39,6 +44,13 @@ struct timespec LOOP_TIME_STEP = { 0, 0.1 * 1e9}; // 0.1 seconds
                vm->errormsg);                                                          \
    }
 
+/* Global variable flag for interrupts */
+volatile sig_atomic_t stop_signal;
+
+void interrupt_handler(int signum) {
+    stop_signal = 1;
+}
+
 /**
  * @fn timespec_diff(struct timespec *, struct timespec *, struct timespec *)
  * @brief Compute the diff of two timespecs, that is a - b = result.
@@ -55,11 +67,23 @@ void timespec_diff(struct timespec *a, struct timespec *b, struct timespec *resu
     }
 }
 
+/**
+ * @brief print Usage
+ * 
+ * @param path binary path 
+ * @param status exit code
+ */
 void usage(const char* path, int status) {
-   fprintf(stderr, "Usage:\n\t%s [--trace] [--loop] <file.bo> <file.bdb>\n\n", path);
+   fprintf(stderr, "Usage:\n\t%s [--trace] [--server] <file.bo> <file.bdb>\n\n", path);
    exit(status);
 }
 
+/**
+ * @brief print all symbols
+ * 
+ * @param vm 
+ * @return int 
+ */
 int print(buzzvm_t vm) {
    for(int i = 1; i < buzzdarray_size(vm->lsyms->syms); ++i) {
       buzzvm_lload(vm, i);
@@ -98,6 +122,32 @@ int print(buzzvm_t vm) {
    return buzzvm_ret0(vm);
 }
 
+/**
+ * @brief Process incoming messages from server
+ * 
+ * @param vm 
+ * @param server_socket 
+ */
+void ProcessInMsgs(buzzvm_t vm, int server_socket) {
+    char buff[1024];
+    ssize_t bytesRead;
+
+    if ((bytesRead = read(server_socket, buff, sizeof(buff))) > 0) {
+        buff[bytesRead] = '\0';
+        printf("From Server[%ld] : %s\n", bytesRead, buff);
+    }
+}
+
+/**
+ * @brief Process any message to be sent to server
+ * 
+ * @param vm 
+ * @param server_socket 
+ */
+void ProcessOutMsgs(buzzvm_t vm, int server_socket) {
+
+}
+
 int main(int argc, char** argv) {
    /* The bytecode filename */
    char* bcfname;
@@ -105,8 +155,13 @@ int main(int argc, char** argv) {
    char* dbgfname;
    /* Whether or not to show the assembly information */
    int trace = 0;
-   /* Whether or not to run init and loop functions */
-   int loop = 0;
+   /* Whether or not to run a server with init and loop functions */
+   int server = 0;
+   /* server socket file descriptor */
+   int server_socket;
+   /* socket address for the server */
+   struct sockaddr_in server_addr;
+
    /* Parse command line */
    if(argc < 3 || argc > 5) usage(argv[0], 0);
    if(argc == 3) {
@@ -120,6 +175,46 @@ int main(int argc, char** argv) {
          check_arg(argv[2]);
       }
    }
+
+   /* If in server mode */
+   if(server) {
+      /* Prepare the sockaddr_in structure */
+      server_addr.sin_family = AF_INET;
+      server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+      server_addr.sin_port = htons(8080);
+
+      /* Configure signals */
+      if (signal(SIGINT, interrupt_handler) == SIG_ERR) {
+         perror("Cannot configure to listen to interrupt signals");
+         exit(1);
+      }
+      if (signal(SIGPIPE, interrupt_handler) == SIG_ERR) {
+         perror("Cannot configure to stop at SIGPIPE");
+         exit(1);
+      }
+
+      /* Create server socket */
+      server_socket = socket(AF_INET, SOCK_STREAM, 0);
+      if (server_socket == -1) {
+         printf("socket creation failed...\n");
+         exit(1);
+      }
+
+      /* Connect to server socket */
+      if (connect(server_socket, (struct sockaddr_in *)&server_addr, sizeof(server_addr)) != 0) {
+         perror("Cannot connect to server!");
+         exit(1);
+      } else {
+         printf("connected to the server..\n");
+      }
+
+      /* Configure the socket to be in non-blocking mode */
+      if (fcntl(server_socket, F_SETFL, fcntl(server_socket, F_GETFL) | O_NONBLOCK) < 0) {
+         perror("Cannot configure socket to be in non-blocking mode");
+         exit(1);
+      }
+   }
+
    /* Read bytecode and fill in data structure */
    FILE* fd = fopen(bcfname, "rb");
    if(!fd) perror(bcfname);
@@ -155,7 +250,7 @@ int main(int argc, char** argv) {
    if(vm->state == BUZZVM_STATE_DONE) {
       /* Execution terminated without errors */
       if(trace) buzzdebug_stack_dump(vm, 1, stdout);
-      if (!loop) { // if not in loop mode, print this
+      if (!server) { // if not in server mode, print this
          fprintf(stdout, "%s: execution terminated correctly\n\n",
                bcfname);
       }
@@ -169,7 +264,7 @@ int main(int argc, char** argv) {
       retval = 1;
    }
 
-   if (loop) {
+   if (server) {
       /* Call the Init() function */
       if(buzzvm_function_call(vm, "init", 0) != BUZZVM_STATE_READY) {
          /* Print debug info to stderr */
@@ -179,9 +274,11 @@ int main(int argc, char** argv) {
          struct timespec startTime, endTime, deltaTime, sleepTime;
          clock_gettime(CLOCK_MONOTONIC_RAW, &startTime);
 
-         /* Infinite Loop */
-         while(vm->state == BUZZVM_STATE_READY) {
-            // ProcessInMsgs();
+         /* Infinite Loop breaking with interrupts */
+         while(vm->state == BUZZVM_STATE_READY && !stop_signal) {
+            /* Check for any incoming messages from server and parse */
+            ProcessInMsgs(vm, server_socket);
+            /* If trace is enabled */
             if(trace) buzzdebug_stack_dump(vm, 1, stdout);
             if(buzzvm_function_call(vm, "step", 0) != BUZZVM_STATE_READY) {
                /* Print debug info to stderr */
@@ -191,7 +288,8 @@ int main(int argc, char** argv) {
             }
             /* Remove useless return value from stack */
             buzzvm_pop(vm);
-            // ProcessOutMsgs();
+            /* Check for any outgoing messages and send */
+            ProcessOutMsgs(vm, server_socket);
 
             /* Loop time management */
             clock_gettime(CLOCK_MONOTONIC_RAW, &endTime);
