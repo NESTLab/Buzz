@@ -332,6 +332,46 @@ int main(int argc, char** argv) {
          exit(1);
       }
    }
+
+   /* If in server mode */
+   if(server) {
+      /* Prepare the sockaddr_in structure */
+      server_addr.sin_family = AF_INET;
+      server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+      server_addr.sin_port = htons(8080);
+
+      /* Configure signals */
+      if (signal(SIGINT, interrupt_handler) == SIG_ERR) {
+         perror("Cannot configure to listen to interrupt signals");
+         exit(1);
+      }
+      if (signal(SIGPIPE, interrupt_handler) == SIG_ERR) {
+         perror("Cannot configure to stop at SIGPIPE");
+         exit(1);
+      }
+
+      /* Create server socket */
+      server_socket = socket(AF_INET, SOCK_STREAM, 0);
+      if (server_socket == -1) {
+         printf("socket creation failed...\n");
+         exit(1);
+      }
+
+      /* Connect to server socket */
+      if (connect(server_socket, (struct sockaddr_in *)&server_addr, sizeof(server_addr)) != 0) {
+         perror("Cannot connect to server!");
+         exit(1);
+      } else {
+         printf("connected to the server..\n");
+      }
+
+      /* Configure the socket to be in non-blocking mode */
+      if (fcntl(server_socket, F_SETFL, fcntl(server_socket, F_GETFL) | O_NONBLOCK) < 0) {
+         perror("Cannot configure socket to be in non-blocking mode");
+         exit(1);
+      }
+   }
+
    /* Read bytecode and fill in data structure */
    FILE* fd = fopen(bcfname, "rb");
    if(!fd) perror(bcfname);
