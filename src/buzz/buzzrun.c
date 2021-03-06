@@ -332,7 +332,6 @@ int main(int argc, char** argv) {
          exit(1);
       }
    }
-
    /* If in server mode */
    if(server) {
       /* Prepare the sockaddr_in structure */
@@ -349,14 +348,12 @@ int main(int argc, char** argv) {
          perror("Cannot configure to stop at SIGPIPE");
          exit(1);
       }
-
       /* Create server socket */
       server_socket = socket(AF_INET, SOCK_STREAM, 0);
       if (server_socket == -1) {
          printf("socket creation failed...\n");
          exit(1);
       }
-
       /* Connect to server socket */
       if (connect(server_socket, (struct sockaddr_in *)&server_addr, sizeof(server_addr)) != 0) {
          perror("Cannot connect to server!");
@@ -364,14 +361,17 @@ int main(int argc, char** argv) {
       } else {
          printf("connected to the server..\n");
       }
-
+      /* Read Robot ID(First message sent by server is server ID) */
+      if(read(server_socket, &robot_id, sizeof(robot_id)) <= 0) {
+         perror("Server disconnected / cannot receive Robot ID.");
+         exit(1);
+      }
       /* Configure the socket to be in non-blocking mode */
       if (fcntl(server_socket, F_SETFL, fcntl(server_socket, F_GETFL) | O_NONBLOCK) < 0) {
          perror("Cannot configure socket to be in non-blocking mode");
          exit(1);
       }
    }
-
    /* Read bytecode and fill in data structure */
    FILE* fd = fopen(bcfname, "rb");
    if(!fd) perror(bcfname);
@@ -396,9 +396,6 @@ int main(int argc, char** argv) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "log", 1));
    buzzvm_pushcc(vm, buzzvm_function_register(vm, print));
    buzzvm_gstore(vm);
-
-   //TODO: register other functions like controller, print, clear, debug, 
-
    /* Run byte code */
    do if(trace) buzzdebug_stack_dump(vm, 1, stdout);
    while(buzzvm_step(vm) == BUZZVM_STATE_READY);
