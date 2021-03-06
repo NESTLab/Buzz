@@ -30,7 +30,12 @@ void check_clients(int server_socket, buzzdarray_t clients) {
     /* Check if new client is tryi  ng to connect */
     if ((new_sock = accept(server_socket, NULL, NULL)) > -1) {
         printf("Connection accepted : %d\n", new_sock);
-
+        /* Send Robot ID to the connected client */
+        uint16_t robot_id = new_sock;
+        if (write(new_sock, &robot_id, sizeof(robot_id)) == -1) {
+            perror("Cannot write to client");
+            exit(1);
+        }
         /* Configure the socket in non-blocking mode */
         if (fcntl(new_sock, F_SETFL, fcntl(new_sock, F_GETFL) | O_NONBLOCK) < 0) {
             perror("Cannot configure socket to be in non-blocking mode");
@@ -44,23 +49,84 @@ void check_clients(int server_socket, buzzdarray_t clients) {
        any data or connection is closed */
     for (int64_t i = 0; i < buzzdarray_size(clients); ++i) {
         const int client_socket = buzzdarray_get(clients, i, int);
-
-        ssize_t read_size;
-        const size_t BUFF_SIZE = 1024 * 1024;
-        char buf[BUFF_SIZE];
-
         /* Check if any data is available from client */
-        while ((read_size = recv(client_socket, buf, BUFF_SIZE, 0)) > 0) {
-            buf[read_size] = '\0';
-            printf("Received [%ld bytes]\n", read_size);
-        }
-
-        if (read_size == 0) {
-            printf("Client disconnected\n");
-            // fflush(stdout);
+        uint16_t robot_id;
+        ssize_t bytes_read = read(client_socket, &robot_id, sizeof(uint16_t));
+        if(bytes_read == 0) {
+            fprintf(stderr, "Client %d disconnected\n", client_socket);
             buzzdarray_remove(clients, i);
+            continue;
+        } else if (bytes_read == -1) {
+            continue; // nothing to read
         }
-        // if (read_size == -1) : No data to receive from client !
+        if(robot_id != client_socket) {
+            printf("Wrong Client ID!! Communication Problem!!\n");
+            continue;
+        }
+        /* Next is the size of incoming data (payload) */
+        int64_t size_of_incoming_data;
+        if((bytes_read = read(client_socket, &size_of_incoming_data, sizeof(int64_t))) == 0) {
+            fprintf(stderr, "Client %d disconnected\n", client_socket);
+            buzzdarray_remove(clients, i);
+            continue;
+        } else if (bytes_read == -1) {
+            continue; // nothing to read
+        }
+        printf("Incoming %ld bytes from client %d\n", size_of_incoming_data, robot_id);
+        /* Create an object to store incoming data */
+        char data[size_of_incoming_data];
+        /* To loop until we read all the info */
+        int64_t total_read = 0;
+        char buffer[1024];
+        while (total_read < size_of_incoming_data && !stop_signal) {
+            bytes_read = read(client_socket, buffer, sizeof(buffer));
+            if (bytes_read == 0) {
+                fprintf(stderr, "client disconnected");
+                buzzdarray_remove(clients, i);
+                break;
+            }else if(bytes_read == -1) {
+                perror("No more data to read!");
+                break;
+            }
+            memcpy((data + total_read), buffer, bytes_read);
+            total_read += bytes_read;
+        }
+        /* Check if we have complete data */
+        if (total_read < size_of_incoming_data) {
+            fprintf(stderr, "Cannot get the complete message, read %ld out of %ld\n", total_read, size_of_incoming_data);
+            continue;
+        }
+        printf("forwarding %ld bytes to all clients\n", size_of_incoming_data);
+        /* Broadcast it to all clients */
+        for (int64_t j = 0; j < buzzdarray_size(clients); ++j) {
+            if(i == j) continue; // skip the current client(sender)
+            const int new_client_socket = buzzdarray_get(clients, j, int);
+            /* Set client socket to blocking */
+            if (fcntl(new_client_socket, F_SETFL,  fcntl(new_client_socket, F_GETFL) & ~(O_NONBLOCK)) < 0) {
+                perror("Cannot configure socket to be in blocking mode");
+                continue;
+            }
+            /* Write sender robot id to the client */
+            if (write(new_client_socket, &robot_id, sizeof(robot_id)) == -1) {
+                perror("Cannot write to client");
+                continue;
+            }
+            /* Write size of data(payload) to the client */
+            if (write(new_client_socket, &size_of_incoming_data, sizeof(size_of_incoming_data)) == -1) {
+                perror("Cannot write to client");
+                continue;
+            }
+            /* Write data(payload) to the client */
+            if (write(new_client_socket, data, size_of_incoming_data) == -1) {
+                perror("Cannot write to client");
+                continue;
+            }
+            /* Set client socket back to non-blocking */
+            if (fcntl(new_client_socket, F_SETFL, fcntl(new_client_socket, F_GETFL) | O_NONBLOCK) < 0) {
+                perror("Cannot configure socket to be in non-blocking mode");
+                continue;
+            }
+        }
     }
 }
 
@@ -160,7 +226,7 @@ int main(int argc, char *argv[]) {
     while (!stop_signal) {
         check_clients(server_socket, clients);
 
-        send_from_stdin(clients);
+        // send_from_stdin(clients);
 
         /*=================== Loop rate management ================*/
         clock_gettime(CLOCK_MONOTONIC, &ts_end);
