@@ -22,16 +22,16 @@ void interrupt_handler(int signum) {
 }
 
 void read_from_server(int server_socket) {
-    char buff[1024];
+    char buff[1024 * 1024];
     ssize_t bytesRead;
 
     if ((bytesRead = read(server_socket, buff, sizeof(buff))) > 0) {
         buff[bytesRead] = '\0';
-        printf("From Server[%ld] : %s\n", bytesRead, buff);
+        printf("From Server[%ld bytes]\n", bytesRead);
     }
 }
 
-void send_to_server(int server_socket, char *data, size_t size) {
+void send_to_server(int server_socket, void *data, size_t size) {
     if (write(server_socket, data, size) == -1) {
         perror("Cannot write to server");
         stop_signal = 1;
@@ -53,6 +53,13 @@ void send_from_stdin(int server_socket) {
     if (select(1, &readfds, NULL, NULL, &timeout)) {
         scanf("%s", message);
         printf("Sending message [%ld]: %s\n", strlen(message), message);
+        
+        uint16_t v = 10; // Robot ID
+        send_to_server(server_socket, &v, sizeof(v));
+
+        v = strlen(message); // Number of messages
+        send_to_server(server_socket, &v, sizeof(v));
+
         send_to_server(server_socket, message, strlen(message));
     }
 

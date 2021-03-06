@@ -129,13 +129,64 @@ int print(buzzvm_t vm) {
  * @param server_socket 
  */
 void process_in_msgs(buzzvm_t vm, int server_socket) {
-    char buff[1024];
-    ssize_t bytesRead;
-
-    if ((bytesRead = read(server_socket, buff, sizeof(buff))) > 0) {
-        buff[bytesRead] = '\0';
-        printf("From Server[%ld] : %s\n", bytesRead, buff);
-    }
+   /* first data is robot ID */
+   uint16_t robot_id;
+   ssize_t bytes_read = read(server_socket, &robot_id, sizeof(uint16_t));
+   if(bytes_read == 0) {
+      perror("Server disconnected");
+      exit(1);
+   } else if (bytes_read == -1) {
+      return; // nothing to read
+   }
+   /* Next is the size of payload */
+   int64_t size_of_incoming_data;
+   /* read the size of incoming data */
+   if((bytes_read = read(server_socket, &size_of_incoming_data, sizeof(int64_t))) == 0) {
+      perror("Server disconnected");
+      exit(1);
+   } else if (bytes_read == -1) {
+      return; // nothing to read
+   }
+   /* Set Server socket to blocking */
+   if (fcntl(server_socket, F_SETFL,  fcntl(server_socket, F_GETFL) & ~(O_NONBLOCK)) < 0) {
+      perror("Cannot configure socket to be in blocking mode");
+      return;
+   }
+   /* If we got any data */
+   if (size_of_incoming_data > 0) {
+      /* Create an object to store incoming data */
+      char data[size_of_incoming_data];
+      /* To loop until we read all the info */
+      int64_t total_read = 0;
+      char buffer[1024];
+      while (total_read < size_of_incoming_data && !stop_signal) {
+         bytes_read = read(server_socket, buffer, sizeof(buffer));
+         if (bytes_read == 0) {
+            perror("Server disconnected");
+            exit(1);
+         }else if(bytes_read == -1) {
+            perror("No more data to read!");
+            break;
+         }
+         memcpy((data + total_read), buffer, bytes_read);
+         total_read += bytes_read;
+      }
+      /* Check if we have complete data */
+      if (total_read < size_of_incoming_data) {
+         fprintf(stderr, "Cannot get the complete message, read %ld out of %ld\n", total_read, size_of_incoming_data);
+         return; // nothing to read;
+      }
+      printf("Received new message of [%ld] bytes\n", total_read);
+      buzzinmsg_queue_append(vm, robot_id,
+                        buzzmsg_payload_frombuffer(buffer, size_of_incoming_data));
+      /* Process messages */
+      buzzvm_process_inmsgs(vm);
+   }
+   /* Set Server socket back to non-blocking */
+   if (fcntl(server_socket, F_SETFL, fcntl(server_socket, F_GETFL) | O_NONBLOCK) < 0) {
+      perror("Cannot configure socket to be in non-blocking mode");
+      exit(1);
+   }
 }
 
 /**
@@ -147,12 +198,17 @@ void process_in_msgs(buzzvm_t vm, int server_socket) {
 void process_out_msgs(buzzvm_t vm, int server_socket) {
    /* Process outgoing messages */
    buzzvm_process_outmsgs(vm);
-   // /* Send robot id */
-   // write(server_socket, &vm->robot, sizeof(vm->robot));
+   /* Are there any message in queue */
+   if(buzzoutmsg_queue_isempty(vm)) return;
    /* Set Server socket to blocking */
    if (fcntl(server_socket, F_SETFL,  fcntl(server_socket, F_GETFL) & ~(O_NONBLOCK)) < 0) {
       perror("Cannot configure socket to be in blocking mode");
       return;
+   }
+   /* Send robot id to server */
+   if (write(server_socket, &vm->robot, sizeof(vm->robot)) == -1) {
+      perror("Cannot write to server");
+      exit(1);
    }
    /* Loop through buzzoutmsg queue */
    do {
@@ -160,23 +216,23 @@ void process_out_msgs(buzzvm_t vm, int server_socket) {
       if(buzzoutmsg_queue_isempty(vm)) break;
       /* Get first message */
       buzzmsg_payload_t m = buzzoutmsg_queue_first(vm);
-      /* Send to server */
-      /* dArray size */
-      write(server_socket, &buzzmsg_payload_size(m), sizeof(buzzmsg_payload_size(m)));
-
-      int64_t total_size = buzzmsg_payload_size(m);
-      ssize_t written = 0;
-      int64_t total_written = 0;
-      
-      /* Loop until all data has been sent */
-      while (total_written < total_size) {
-         written = write(server_socket, (m->data + total_written), total_size - total_written);
-         if(written == -1) {
-            perror("Cannot write to server");
-            stop_signal = 1;
-            return;
-         }
-         total_written += written;
+      // const size_t siz = 1024 * 1024;
+      // buzzmsg_payload_t m = buzzmsg_payload_new(10);
+      // buzzmsg_serialize_u8(m, BUZZMSG_TYPE_COUNT);
+      // buzzmsg_serialize_u16(m, siz);
+      // for(size_t i = 0; i < siz; ++i) {
+      //    buzzmsg_serialize_u16(m, (uint16_t) 32823984);
+      // }
+      /* Send data(payload) size to server */
+      if (write(server_socket, &buzzmsg_payload_size(m), sizeof(buzzmsg_payload_size(m))) == -1) {
+         perror("Cannot write to server");
+         exit(1);
+      }
+      /* Send data(payload) to server */
+      printf("Sending %ld bytes from Robot ID: %d\n", buzzmsg_payload_size(m), vm->robot);
+      if (write(server_socket, m->data, buzzmsg_payload_size(m)) == -1) {
+         perror("Cannot write to server");
+         exit(1);
       }
       /* Get rid of message */
       buzzoutmsg_queue_next(vm);
@@ -202,7 +258,8 @@ int main(int argc, char** argv) {
    int server_socket;
    /* socket address for the server */
    struct sockaddr_in server_addr;
-
+   /* robot ID of current VM */
+   uint16_t robot_id = 1;
    /* Parse command line */
    if(argc < 3 || argc > 5) usage(argv[0], 0);
    if(argc == 3) {
@@ -216,7 +273,6 @@ int main(int argc, char** argv) {
          check_arg(argv[2]);
       }
    }
-
    /* If in server mode */
    if(server) {
       /* Prepare the sockaddr_in structure */
@@ -233,14 +289,12 @@ int main(int argc, char** argv) {
          perror("Cannot configure to stop at SIGPIPE");
          exit(1);
       }
-
       /* Create server socket */
       server_socket = socket(AF_INET, SOCK_STREAM, 0);
       if (server_socket == -1) {
          printf("socket creation failed...\n");
          exit(1);
       }
-
       /* Connect to server socket */
       if (connect(server_socket, (struct sockaddr_in *)&server_addr, sizeof(server_addr)) != 0) {
          perror("Cannot connect to server!");
@@ -248,14 +302,17 @@ int main(int argc, char** argv) {
       } else {
          printf("connected to the server..\n");
       }
-
+      /* Read Robot ID(First message sent by server is server ID) */
+      if(read(server_socket, &robot_id, sizeof(robot_id)) <= 0) {
+         perror("Server disconnected / cannot receive Robot ID.");
+         exit(1);
+      }
       /* Configure the socket to be in non-blocking mode */
       if (fcntl(server_socket, F_SETFL, fcntl(server_socket, F_GETFL) | O_NONBLOCK) < 0) {
          perror("Cannot configure socket to be in non-blocking mode");
          exit(1);
       }
    }
-
    /* Read bytecode and fill in data structure */
    FILE* fd = fopen(bcfname, "rb");
    if(!fd) perror(bcfname);
@@ -273,16 +330,13 @@ int main(int argc, char** argv) {
       perror(dbgfname);
    }
    /* Create new VM */
-   buzzvm_t vm = buzzvm_new(1);
+   buzzvm_t vm = buzzvm_new(robot_id);
    /* Set byte code */
    buzzvm_set_bcode(vm, bcode_buf, bcode_size);
    /* Register hook functions */
    buzzvm_pushs(vm, buzzvm_string_register(vm, "log", 1));
    buzzvm_pushcc(vm, buzzvm_function_register(vm, print));
    buzzvm_gstore(vm);
-
-   //TODO: register other functions like controller, print, clear, debug, 
-
    /* Run byte code */
    do if(trace) buzzdebug_stack_dump(vm, 1, stdout);
    while(buzzvm_step(vm) == BUZZVM_STATE_READY);
@@ -331,20 +385,17 @@ int main(int argc, char** argv) {
             buzzvm_pop(vm);
             /* Check for any outgoing messages and send */
             process_out_msgs(vm, server_socket);
-
-            /* Loop time management */
+            /*====== Loop time management ======*/
             clock_gettime(CLOCK_MONOTONIC_RAW, &endTime);
             /* Calculate sleep time */
             timespec_diff(&endTime, &startTime, &deltaTime);
             timespec_diff(&LOOP_TIME_STEP, &deltaTime, &sleepTime);
             /* Sleep */
-            // printf("Sleeps for: %ld.%.9ld\n", sleepTime.tv_sec, sleepTime.tv_nsec);
             nanosleep(&sleepTime, NULL);
             clock_gettime(CLOCK_MONOTONIC_RAW, &startTime);
          }
       }
    }
-
    /* Destroy VM */
    free(bcode_buf);
    buzzdebug_destroy(&dbg_buf);
