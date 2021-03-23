@@ -74,7 +74,7 @@ void timespec_diff(struct timespec *a, struct timespec *b, struct timespec *resu
  * @param status exit code
  */
 void usage(const char* path, int status) {
-   fprintf(stderr, "Usage:\n\t%s [--trace] [--server] <file.bo> <file.bdb>\n\n", path);
+   fprintf(stderr, "Usage:\n\t%s [--trace] [--server [server_ip:port]] <file.bo> <file.bdb>\n\n", path);
    exit(status);
 }
 
@@ -216,20 +216,13 @@ void process_out_msgs(buzzvm_t vm, int server_socket) {
       if(buzzoutmsg_queue_isempty(vm)) break;
       /* Get first message */
       buzzmsg_payload_t m = buzzoutmsg_queue_first(vm);
-      // const size_t siz = 1024 * 1024;
-      // buzzmsg_payload_t m = buzzmsg_payload_new(10);
-      // buzzmsg_serialize_u8(m, BUZZMSG_TYPE_COUNT);
-      // buzzmsg_serialize_u16(m, siz);
-      // for(size_t i = 0; i < siz; ++i) {
-      //    buzzmsg_serialize_u16(m, (uint16_t) 32823984);
-      // }
       /* Send data(payload) size to server */
       if (write(server_socket, &buzzmsg_payload_size(m), sizeof(buzzmsg_payload_size(m))) == -1) {
          perror("Cannot write to server");
          exit(1);
       }
       /* Send data(payload) to server */
-      printf("Sending %ld bytes from Robot ID: %d\n", buzzmsg_payload_size(m), vm->robot);
+      // printf("Sending %ld bytes from Robot ID: %d\n", buzzmsg_payload_size(m), vm->robot);
       if (write(server_socket, m->data, buzzmsg_payload_size(m)) == -1) {
          perror("Cannot write to server");
          exit(1);
@@ -261,25 +254,51 @@ int main(int argc, char** argv) {
    /* robot ID of current VM */
    uint16_t robot_id = 1;
    /* Parse command line */
-   if(argc < 3 || argc > 5) usage(argv[0], 0);
-   if(argc == 3) {
-      bcfname = argv[1];
-      dbgfname = argv[2];
-   } else {
-      bcfname = argv[argc - 2];
-      dbgfname = argv[argc - 1];
-      check_arg(argv[1]);
-      if(argc == 5) {
-         check_arg(argv[2]);
+
+   if(argc < 3 || argc > 6) usage(argv[0], 0);
+
+   for (int i = 1; i < argc - 2; i++) {
+      if(strcmp(argv[i], "--trace") == 0) {
+         trace = 1;
+      } else if(strcmp(argv[i], "--server") == 0) {
+         server = 1;
+         server_addr.sin_family = AF_INET;
+         /* Check if next argument is a TCP/IP address with port, for example 127.0.0.1:8080 */
+         if(i + 1 < argc) {
+            /* Check if ":" exists in the next argument */
+            if(strchr(argv[i + 1], ':') != NULL) {
+               /* Get Hostname/IP address */
+               char* token = strtok(argv[i + 1], ":");
+               server_addr.sin_addr.s_addr = inet_addr(token);
+               /* Get port */
+               char* port = strtok(NULL, ":");
+               /* Parse to uint16_t */
+               char* end;
+               intmax_t val = strtoimax(port, &end, 10);
+               if (val < 0 || val > UINT16_MAX || end == port || *end != '\0') {
+                  // Cannot parse as Port, conitnue to next argument
+                  continue;
+               }
+               server_addr.sin_port = htons((uint16_t) val);
+               /* Skip the next argument since it is parsed here */
+               i++; // skip next
+            } else {
+               /* If server not specified, give defaults */
+               server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+               server_addr.sin_port = htons(8080);
+            }
+         }
+      } else {
+         fprintf(stderr, "error: %s: unrecognized option '%s'\n", argv[0], argv[i]);
+         usage(argv[0], 1);
       }
    }
+   bcfname = argv[argc - 2];
+   dbgfname = argv[argc - 1];
    /* If in server mode */
    if(server) {
-      /* Prepare the sockaddr_in structure */
-      server_addr.sin_family = AF_INET;
-      server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-      server_addr.sin_port = htons(8080);
-
+      printf("Connecting to server at %s:%d\n", inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));
+   
       /* Configure signals */
       if (signal(SIGINT, interrupt_handler) == SIG_ERR) {
          perror("Cannot configure to listen to interrupt signals");
@@ -300,7 +319,7 @@ int main(int argc, char** argv) {
          perror("Cannot connect to server!");
          exit(1);
       } else {
-         printf("connected to the server..\n");
+         printf("Connected to the server!\n");
       }
       /* Read Robot ID(First message sent by server is server ID) */
       if(read(server_socket, &robot_id, sizeof(robot_id)) <= 0) {
