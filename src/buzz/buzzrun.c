@@ -332,13 +332,12 @@ int main(int argc, char** argv) {
          exit(1);
       }
    }
+   bcfname = argv[argc - 2];
+   dbgfname = argv[argc - 1];
    /* If in server mode */
    if(server) {
-      /* Prepare the sockaddr_in structure */
-      server_addr.sin_family = AF_INET;
-      server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-      server_addr.sin_port = htons(8080);
-
+      printf("Connecting to server at %s:%d\n", inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));
+   
       /* Configure signals */
       if (signal(SIGINT, interrupt_handler) == SIG_ERR) {
          perror("Cannot configure to listen to interrupt signals");
@@ -359,7 +358,7 @@ int main(int argc, char** argv) {
          perror("Cannot connect to server!");
          exit(1);
       } else {
-         printf("connected to the server..\n");
+         printf("Connected to the server!\n");
       }
       /* Read Robot ID(First message sent by server is server ID) */
       if(read(server_socket, &robot_id, sizeof(robot_id)) <= 0) {
