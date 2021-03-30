@@ -2,6 +2,7 @@
 #include <arpa/inet.h>   // inet_ntoa
 #include <buzzdarray.h>  // buzzdarray
 #include <fcntl.h>       // fcntl
+#include <inttypes.h>    // strtoimax
 #include <math.h>        // modf
 #include <netinet/in.h>  // sockaddr_in
 #include <signal.h>      // signal, sig_atomic_t
@@ -20,7 +21,6 @@
 volatile sig_atomic_t stop_signal;
 
 void interrupt_handler(int signum) {
-    printf("Signal Handler %d\n", signum);
     stop_signal = 1;
 }
 
@@ -130,34 +130,15 @@ void check_clients(int server_socket, buzzdarray_t clients) {
     }
 }
 
-void send_data(buzzdarray_t clients, char *data, size_t size) {
-    for (int64_t i = 0; i < buzzdarray_size(clients); ++i) {
-        const int client_socket = buzzdarray_get(clients, i, int);
-        if (write(client_socket, data, size) == -1) {
-            perror("Cannot write to client");
-        }
-    }
-}
-
-void send_from_stdin(buzzdarray_t clients) {
-    fd_set readfds;
-    FD_ZERO(&readfds);
-    FD_SET(STDIN_FILENO, &readfds);
-    fd_set savefds = readfds;
-
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 0;
-
-    char message[50];
-
-    if (select(1, &readfds, NULL, NULL, &timeout)) {
-        scanf("%s", message);
-        printf("Sending message [%ld]: %s\n", strlen(message), message);
-        send_data(clients, message, strlen(message));
-    }
-
-    readfds = savefds;
+/**
+ * @brief print Usage
+ * 
+ * @param path binary path 
+ * @param status exit code
+ */
+void usage(const char* path, int status) {
+   fprintf(stderr, "Usage:\n\t%s [--port port_number]\n\n", path);
+   exit(status);
 }
 
 int main(int argc, char *argv[]) {
@@ -167,7 +148,27 @@ int main(int argc, char *argv[]) {
     /* Prepare the sockaddr_in structure */
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
-    server.sin_port = htons(8080);
+
+    if (argc == 1) {
+        /* Default port */
+        server.sin_port = htons(8080);
+    } else if (argc == 3) {
+        if(strcmp(argv[1], "--port") == 0) {
+            char* end;
+            intmax_t val = strtoimax(argv[2], &end, 10);
+            if (val <= 0 || val > UINT16_MAX || end == argv[2] || *end != '\0') {
+                // Cannot parse as Port
+                fprintf(stderr, "Cannot parse Port: %s\n", argv[2]);
+                exit(1);
+            }
+            server.sin_port = htons((uint16_t) val);
+        } else {
+            fprintf(stderr, "error: %s: unrecognized option '%s'\n", argv[0], argv[1]);
+            usage(argv[0], 1);
+        }
+    } else {
+        usage(argv[0], 0);
+    }
 
     /* Configure signals */
     if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
@@ -212,7 +213,7 @@ int main(int argc, char *argv[]) {
         perror("Listen failed");
         exit(1);
     } else {
-        printf("Server listening at %s:%d\n", inet_ntoa(server.sin_addr), ntohs(server.sin_port));
+        printf("Server listening on: \033[0;33m %s:%d \033[0m \n Hit CTRL-C to stop the server\n\n", inet_ntoa(server.sin_addr), ntohs(server.sin_port));
     }
 
     /* Server loop setup */
@@ -225,8 +226,6 @@ int main(int argc, char *argv[]) {
     /* Main Loop */
     while (!stop_signal) {
         check_clients(server_socket, clients);
-
-        // send_from_stdin(clients);
 
         /*=================== Loop rate management ================*/
         clock_gettime(CLOCK_MONOTONIC, &ts_end);
