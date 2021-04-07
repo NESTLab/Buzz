@@ -42,6 +42,8 @@ buzzobj_t buzzobj_new(uint16_t type) {
    o->o.type = type;
    /* Set the object marker */
    o->o.marker = 0;
+   /* Set the reactive ID to 0 */
+   o->o.reactive_id = 0;
    /* Take care of special initialization for specific types */
    if(type == BUZZTYPE_TABLE) {
       o->t.value = buzzdict_new(BUZZTYPE_TABLE_BUCKETS,

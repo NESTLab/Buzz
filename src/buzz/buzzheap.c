@@ -207,6 +207,8 @@ void buzzheap_gc(struct buzzvm_s* vm) {
    buzzdict_foreach(vm->gsyms, buzzheap_gsymobj_mark, vm);
    /* Go through all the objects in the VM stack and mark them */
    buzzdarray_foreach(vm->stacks, buzzheap_stack_mark, vm);
+   /* Go through all the objects in the reactives and mark them */
+   buzzdict_foreach(vm->reactives, buzzheap_dictobj_mark, vm);
    /* Go through all the objects in the local symbol stack and mark them */
    buzzdarray_foreach(vm->lsymts, buzzheap_lsyms_mark, vm);
    /* Go through all the objects in the virtual stigmergy and mark them */
