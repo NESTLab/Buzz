@@ -37,7 +37,6 @@ int buzzreactive_create(buzzvm_t vm) {
    buzzobj_t o = buzzvm_stack_at(vm, 1);
    /* Set the variable as reactive */
    o->o.reactive_id = buzzreactive_get_new_rid(vm);
-   
    if(o->o.reactive_id == UINT16_MAX) {
       vm->state    = BUZZVM_STATE_ERROR;
       vm->error    = BUZZVM_ERROR_RID_LIMIT;
@@ -45,9 +44,22 @@ int buzzreactive_create(buzzvm_t vm) {
       buzzvm_pushnil(vm);
       return buzzvm_ret1(vm);
    }
-   buzzdict_set(vm->reactives, &(o->o.reactive_id), &o);
-   buzzvm_push(vm, o);
+   buzzreactive_t new_reactive = buzzreactive_create_obj(o->o.reactive_id);
+   buzzdict_set(vm->reactives, &(o->o.reactive_id), &new_reactive);
    return buzzvm_ret1(vm);
+}
+
+/****************************************/
+/****************************************/
+
+buzzreactive_t buzzreactive_create_obj(uint16_t reactive_id) {
+   /* Create a new reactive obj. calloc() zeroes everything. */
+   buzzreactive_t ret   = (buzzreactive_t) calloc(1, sizeof(struct buzzreactive_s));
+   ret->reactive_id     = reactive_id;
+   ret->dependents      = buzzdarray_new(1, sizeof(uint16_t), NULL);
+   ret->fptrlist        = buzzdarray_new(1, sizeof(buzzobj_t), NULL);
+   ret->expressions     = buzzdarray_new(1, sizeof(buzzreactive_expr_t), NULL); 
+   return ret;
 }
 
 /****************************************/
@@ -58,7 +70,7 @@ uint16_t buzzreactive_get_new_rid(buzzvm_t vm) {
    uint16_t new_rid = buzzdict_size(vm->reactives) + 1;
  
    while(new_rid < UINT16_MAX) {
-      if (!buzzdict_get(vm->reactives, &(new_rid), buzzobj_t)) {
+      if (!buzzdict_get(vm->reactives, &(new_rid), buzzreactive_t)) {
          return new_rid;
       }
 
@@ -67,6 +79,13 @@ uint16_t buzzreactive_get_new_rid(buzzvm_t vm) {
    return UINT16_MAX;
 }
 
+/****************************************/
+/****************************************/
+
+void buzzreactive_destroy(buzzdict_t* reactives) {
+   /* TODO:reactive */
+   buzzdict_destroy(reactives);
+}
 
 /****************************************/
 /****************************************/
