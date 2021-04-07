@@ -28,6 +28,7 @@ extern "C" {
    typedef struct {
       uint16_t type;
       uint16_t marker;
+      uint16_t reactive_id;
    } buzznil_t;
 
    /*
@@ -36,6 +37,7 @@ extern "C" {
    typedef struct {
       uint16_t type;
       uint16_t marker;
+      uint16_t reactive_id;
       int32_t  value;
    } buzzint_t;
 
@@ -45,6 +47,7 @@ extern "C" {
    typedef struct {
       uint16_t type;
       uint16_t marker;
+      uint16_t reactive_id;
       float    value;
    } buzzfloat_t;
 
@@ -54,6 +57,7 @@ extern "C" {
    typedef struct {
       uint16_t type;
       uint16_t marker;
+      uint16_t reactive_id;
       struct {
          uint16_t sid;    // The string id
          const char* str; // The actual string
@@ -66,6 +70,7 @@ extern "C" {
    typedef struct {
       uint16_t   type;
       uint16_t   marker;
+      uint16_t   reactive_id;
       buzzdict_t value;
    } buzztable_t;
 
@@ -75,6 +80,7 @@ extern "C" {
    typedef struct {
       uint16_t type;
       uint16_t marker;
+      uint16_t reactive_id;
       struct {
          int32_t ref;         // jump address or function id
          buzzdarray_t actrec; // activation record
@@ -88,6 +94,7 @@ extern "C" {
    typedef struct {
       uint16_t type;
       uint16_t marker;
+      uint16_t reactive_id;
       void*    value;
    } buzzuserdata_t;
 
@@ -98,6 +105,7 @@ extern "C" {
       struct {
          uint16_t type;    // object type
          uint16_t marker;  // marker for garbage collection
+         uint16_t reactive_id; // Reactive ID, 0 if not a reactive
       }              o;    // as a generic object
       buzznil_t      n;    // as nil
       buzzint_t      i;    // as integer

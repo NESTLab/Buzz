@@ -1,0 +1,8 @@
+x = reactive.create(56)
+
+y = x + 5 
+
+
+log("before change: ", y)
+x = 3
+log("after change : ", y)

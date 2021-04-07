@@ -44,7 +44,8 @@ extern "C" {
       BUZZVM_ERROR_FLIST,    // Function call id out of range
       BUZZVM_ERROR_TYPE,     // Type mismatch
       BUZZVM_ERROR_STRING,   // Unknown string id
-      BUZZVM_ERROR_SWARM     // Unknown swarm id
+      BUZZVM_ERROR_SWARM,    // Unknown swarm id
+      BUZZVM_ERROR_RID_LIMIT // Reactive ID creation limit reached
    } buzzvm_error;
    extern const char *buzzvm_error_desc[];
 
@@ -158,6 +159,8 @@ extern "C" {
       buzzvm_lsyms_t lsyms;
       /* Local variable table list */
       buzzdarray_t lsymts;
+      /* Reactive variables table list */
+      buzzdict_t reactives;
       /* Global symbols */
       buzzdict_t gsyms;
       /* Strings */
