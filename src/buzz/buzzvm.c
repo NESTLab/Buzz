@@ -70,6 +70,34 @@ static uint16_t SWARM_BROADCAST_PERIOD = 10;
       res->f.value = op2->f.value oper op1->f.value;                    \
       buzzvm_push(vm, res);                                             \
    }                                                                    \
+   /* Check if any of two operands is a Reactive */                     \
+   if (op1->o.reactive_id != 0 || op2->o.reactive_id != 0) {            \
+      buzzobj_t res = buzzvm_stack_at(vm, 1);                           \
+      /* make result reactive */                                        \
+      res->o.reactive_id = buzzreactive_get_new_rid(vm);                \
+      if(res->o.reactive_id == UINT16_MAX) {                            \
+         (vm)->state    = BUZZVM_STATE_ERROR;                           \
+         (vm)->error    = BUZZVM_ERROR_RID_LIMIT;                       \
+         (vm)->errormsg = "Cannot create more reactive variables\n";    \
+         return (vm)->state;                                            \
+      }                                                                 \
+      buzzreactive_t res_reactive =                                     \
+                        buzzreactive_create_obj(res->o.reactive_id);    \
+      if(op1->o.reactive_id != 0) {                                     \
+         buzzreactive_t op_reactive = *buzzdict_get((vm)->reactives,    \
+                              &(op1->o.reactive_id), buzzreactive_t);   \
+         buzzdarray_push(op_reactive->dependents, &res->o.reactive_id); \
+      }                                                                 \
+      if(op2->o.reactive_id != 0) {                                     \
+         buzzreactive_t op_reactive = *buzzdict_get((vm)->reactives,    \
+                              &(op2->o.reactive_id), buzzreactive_t);   \
+         buzzdarray_push(op_reactive->dependents, &res->o.reactive_id); \
+      }                                                                 \
+      buzzreactive_expr_t exprn = {*#oper, op1, op2};                   \
+      buzzdarray_push(res_reactive->expressions, &exprn);               \
+      buzzdict_set((vm)->reactives, &res->o.reactive_id,                \
+                                             &res_reactive);            \
+   }                                                                    \
    return (vm)->state;
 
 /*
@@ -543,10 +571,10 @@ buzzvm_t buzzvm_new(uint16_t robot) {
    vm->flist = buzzdarray_new(20, sizeof(buzzvm_funp), NULL);
    /* Create reactive variable tables */
    vm->reactives = buzzdict_new(BUZZVM_REACTIVE_INIT_CAPACITY,
-                            sizeof(int32_t),
+                            sizeof(uint16_t),
                             sizeof(buzzreactive_t),
-                            buzzdict_int32keyhash,
-                            buzzdict_int32keycmp,
+                            buzzdict_uint16keyhash,
+                            buzzdict_uint16keycmp,
                             NULL);
    /* Create swarm list */
    vm->swarms = buzzdict_new(10,
@@ -601,7 +629,7 @@ void buzzvm_destroy(buzzvm_t* vm) {
    /* Get rid of the local variable tables */
    buzzdarray_destroy(&(*vm)->lsymts);
    /* Get rid of the reactive variable table */
-   buzzdict_destroy(&(*vm)->reactives);
+   buzzreactive_destroy(&(*vm)->reactives);
    /* Get rid of the stack */
    buzzdarray_destroy(&(*vm)->stacks);
    /* Get rid of the heap */
