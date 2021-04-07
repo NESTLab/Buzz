@@ -1,6 +1,7 @@
 #include "buzzvm.h"
 #include "buzzvstig.h"
 #include "buzzswarm.h"
+#include "buzzreactive.h"
 #include "buzzmath.h"
 #include "buzzio.h"
 #include "buzzstring.h"
@@ -196,11 +197,12 @@ const char* buzzvm_strerror(buzzvm_t vm) {
 /****************************************/
 /****************************************/
 
-#define BUZZVM_STACKS_INIT_CAPACITY  20
-#define BUZZVM_STACK_INIT_CAPACITY   20
-#define BUZZVM_LSYMTS_INIT_CAPACITY  20
-#define BUZZVM_SYMS_INIT_CAPACITY    20
-#define BUZZVM_STRINGS_INIT_CAPACITY 20
+#define BUZZVM_STACKS_INIT_CAPACITY    20
+#define BUZZVM_STACK_INIT_CAPACITY     20
+#define BUZZVM_LSYMTS_INIT_CAPACITY    20
+#define BUZZVM_SYMS_INIT_CAPACITY      20
+#define BUZZVM_STRINGS_INIT_CAPACITY   20
+#define BUZZVM_REACTIVE_INIT_CAPACITY  20
 
 /****************************************/
 /****************************************/
@@ -539,6 +541,13 @@ buzzvm_t buzzvm_new(uint16_t robot) {
    vm->heap = buzzheap_new();
    /* Create function list */
    vm->flist = buzzdarray_new(20, sizeof(buzzvm_funp), NULL);
+   /* Create reactive variable tables */
+   vm->reactives = buzzdict_new(BUZZVM_REACTIVE_INIT_CAPACITY,
+                            sizeof(int32_t),
+                            sizeof(buzzreactive_t),
+                            buzzdict_int32keyhash,
+                            buzzdict_int32keycmp,
+                            NULL);
    /* Create swarm list */
    vm->swarms = buzzdict_new(10,
                              sizeof(uint16_t),
@@ -591,6 +600,8 @@ void buzzvm_destroy(buzzvm_t* vm) {
    buzzdict_destroy(&(*vm)->gsyms);
    /* Get rid of the local variable tables */
    buzzdarray_destroy(&(*vm)->lsymts);
+   /* Get rid of the reactive variable table */
+   buzzdict_destroy(&(*vm)->reactives);
    /* Get rid of the stack */
    buzzdarray_destroy(&(*vm)->stacks);
    /* Get rid of the heap */
@@ -692,6 +703,8 @@ int buzzvm_set_bcode(buzzvm_t vm,
    buzzobj_register(vm);
    /* Register stigmergy methods */
    buzzvstig_register(vm);
+   /* Register reactive methods */
+   buzzreactive_register(vm);
    /* Register swarm methods */
    buzzswarm_register(vm);
    /* Register math methods */

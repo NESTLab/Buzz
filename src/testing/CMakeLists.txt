@@ -95,6 +95,9 @@ if(NOT CMAKE_CROSSCOMPILING)
   buzz_make(testparsing.bzz)
   add_dependencies(testparsing.bzz bzzparse)
   
+  buzz_make(testreactive.bzz)
+  add_dependencies(testreactive.bzz bzzparse)
+  
   buzz_make(teststigmergy.bzz)
   add_dependencies(teststigmergy.bzz bzzparse)
   
