@@ -87,19 +87,6 @@ int buzzreactive_create(buzzvm_t vm) {
 /****************************************/
 /****************************************/
 
-buzzreactive_t buzzreactive_create_obj(uint16_t reactive_id) {
-   /* Create a new reactive obj. calloc() zeroes everything. */
-   buzzreactive_t ret   = (buzzreactive_t) calloc(1, sizeof(struct buzzreactive_s));
-   ret->reactive_id     = reactive_id;
-   ret->dependents      = buzzdarray_new(1, sizeof(uint16_t), NULL);
-   ret->fptrlist        = buzzdarray_new(1, sizeof(buzzobj_t), NULL);
-   ret->expressions     = buzzdarray_new(1, sizeof(buzzreactive_expr_t), NULL); 
-   return ret;
-}
-
-/****************************************/
-/****************************************/
-
 uint16_t buzzreactive_get_new_rid(buzzvm_t vm) {
    /* start reactive_id with 1 */
    uint16_t new_rid = buzzdict_size(vm->reactives) + 1;

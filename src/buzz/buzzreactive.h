@@ -25,17 +25,6 @@ extern "C" {
    typedef struct buzzreactive_s* buzzreactive_t;
 
    /*
-    * Data for reactive expressions
-    */      
-   struct buzzreactive_expr_s {
-      /* Operator */
-      char optr;
-      buzzobj_t op1;
-      buzzobj_t op2;
-   };
-   typedef struct buzzreactive_expr_s buzzreactive_expr_t;
-
-   /*
     * Forward declaration of the Buzz VM.
     */
    struct buzzvm_s;
