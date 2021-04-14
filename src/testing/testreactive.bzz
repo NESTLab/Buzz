@@ -1,6 +1,6 @@
-x = reactive.create(56)
+x = reactive.create(56.3)
 
-y = x + 5 
+y = x + 5
 
 
 log("before change: ", y)
