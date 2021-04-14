@@ -1,5 +1,6 @@
 #include "buzzdebug.h"
 #include "buzzasm.h"
+#include "buzzreactive.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -397,13 +398,13 @@ void buzzdebug_print_obj(FILE* stream,
                          buzzvm_t vm) {
    switch(o->o.type) {
       case BUZZTYPE_NIL:
-         fprintf(stream, "[nil]");
+         fprintf(stream, "[nil <reactive_id:%d>]", o->o.reactive_id);
          break;
       case BUZZTYPE_INT:
-         fprintf(stream, "[int] %d", o->i.value);
+         fprintf(stream, "[int <reactive_id:%d>] %d", o->o.reactive_id, o->i.value);
          break;
       case BUZZTYPE_FLOAT:
-         fprintf(stream, "[float] %f", o->f.value);
+         fprintf(stream, "[float <reactive_id:%d>] %f", o->o.reactive_id, o->f.value);
          break;
       case BUZZTYPE_TABLE:
          buzzdebug_print_table(stream, o->t.value, vm);
@@ -415,12 +416,50 @@ void buzzdebug_print_obj(FILE* stream,
             fprintf(stream, "[c-closure] %d", o->c.value.ref);
          break;
       case BUZZTYPE_STRING:
-         fprintf(stream, "[string] %d:'%s'", o->s.value.sid, o->s.value.str);
+         fprintf(stream, "[string <reactive_id:%d>] %d:'%s'", o->o.reactive_id, o->s.value.sid, o->s.value.str);
          break;
       default:
          fprintf(stream, "[TODO] type = %d", o->o.type);
    }
 }
+
+/****************************************/
+/****************************************/
+
+struct print_params_s {
+   buzzvm_t vm;
+   FILE* stream;
+};
+
+void print_deps(void* data, void* params_) {
+   struct print_params_s* params = (struct print_params_s*) params_;
+   fprintf(params->stream, "\t\t\t reactive: <%d>\n", *(uint16_t*) data);
+}
+
+/****************************************/
+/****************************************/
+
+void buzz_print_reactives(const void* key, void* data, void* params_) {
+   buzzreactive_t reactive_var = *(buzzreactive_t*) data;
+   struct print_params_s* params = (struct print_params_s*) params_;
+   fprintf(params->stream, "\tReactive[ID: %d]:\n", *(const uint16_t*)key);
+   fprintf(params->stream, "\t\t Value: ");
+   buzzdebug_print_obj(params->stream, reactive_var->value, params->vm);
+   fprintf(params->stream, "\n");
+   fprintf(params->stream, "\t\t Expression: ");
+   if(reactive_var->expr.op1) {
+      buzzdebug_print_obj(params->stream, reactive_var->expr.op1, params->vm);
+      fprintf(params->stream, " <%c> ", reactive_var->expr.optr);
+      buzzdebug_print_obj(params->stream, reactive_var->expr.op2, params->vm);
+   }
+   fprintf(params->stream, "\n");
+   fprintf(params->stream, "\t\t Dependents(%d):\n", buzzset_size(reactive_var->dependents));
+   buzzset_foreach(reactive_var->dependents, print_deps, params_);
+   fprintf(params->stream, "\t\t Closures (%ld):\n", buzzdarray_size(reactive_var->fptrlist));
+}
+
+/****************************************/
+/****************************************/
 
 void buzzdebug_stack_dump(buzzvm_t vm,
                           uint32_t idx,
@@ -443,6 +482,13 @@ void buzzdebug_stack_dump(buzzvm_t vm,
       buzzdebug_print_obj(stream, o, vm);
       fprintf(stream, "\n");
    }
+   struct print_params_s params = {
+      .vm = vm,
+      .stream = stream
+   };
+   fprintf(stream, "---------\n");
+   fprintf(stream, "Reactives (%d):\n", buzzdict_size(vm->reactives));
+   buzzdict_foreach(vm->reactives, buzz_print_reactives, &params);
    fprintf(stream, "============================================================\n\n");
 }
 

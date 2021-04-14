@@ -70,33 +70,29 @@ static uint16_t SWARM_BROADCAST_PERIOD = 10;
       res->f.value = op2->f.value oper op1->f.value;                    \
       buzzvm_push(vm, res);                                             \
    }                                                                    \
-   /* Check if any of two operands is a Reactive */                     \
+   /* Check if any of two operands is Reactive */                       \
    if (op1->o.reactive_id != 0 || op2->o.reactive_id != 0) {            \
       buzzobj_t res = buzzvm_stack_at(vm, 1);                           \
-      /* make result reactive */                                        \
-      res->o.reactive_id = buzzreactive_get_new_rid(vm);                \
-      if(res->o.reactive_id == UINT16_MAX) {                            \
-         (vm)->state    = BUZZVM_STATE_ERROR;                           \
-         (vm)->error    = BUZZVM_ERROR_RID_LIMIT;                       \
-         (vm)->errormsg = "Cannot create more reactive variables\n";    \
+      /* reactive result */                                             \
+      buzzreactive_t res_reactive =                                     \
+                        buzzreactive_create_reactive(vm, res);          \
+      res_reactive->expr.optr = *#oper;                                 \
+      res_reactive->expr.op1 = op1;                                     \
+      res_reactive->expr.op2 = op2;                                     \
+      if((vm)->state == BUZZVM_STATE_ERROR) {                           \
          return (vm)->state;                                            \
       }                                                                 \
-      buzzreactive_t res_reactive =                                     \
-                        buzzreactive_create_obj(res->o.reactive_id);    \
       if(op1->o.reactive_id != 0) {                                     \
          buzzreactive_t op_reactive = *buzzdict_get((vm)->reactives,    \
                               &(op1->o.reactive_id), buzzreactive_t);   \
-         buzzdarray_push(op_reactive->dependents, &res->o.reactive_id); \
+         buzzset_insert(op_reactive->dependents, &res->o.reactive_id);  \
       }                                                                 \
       if(op2->o.reactive_id != 0) {                                     \
          buzzreactive_t op_reactive = *buzzdict_get((vm)->reactives,    \
                               &(op2->o.reactive_id), buzzreactive_t);   \
-         buzzdarray_push(op_reactive->dependents, &res->o.reactive_id); \
+         buzzset_insert(op_reactive->dependents, &res->o.reactive_id);  \
       }                                                                 \
-      buzzreactive_expr_t exprn = {*#oper, op1, op2};                   \
-      buzzdarray_push(res_reactive->expressions, &exprn);               \
-      buzzdict_set((vm)->reactives, &res->o.reactive_id,                \
-                                             &res_reactive);            \
+      buzzreactive_recalculate(vm, res);                                \
    }                                                                    \
    return (vm)->state;
 
@@ -629,7 +625,7 @@ void buzzvm_destroy(buzzvm_t* vm) {
    /* Get rid of the local variable tables */
    buzzdarray_destroy(&(*vm)->lsymts);
    /* Get rid of the reactive variable table */
-   buzzreactive_destroy(&(*vm)->reactives);
+   buzzreactives_destroy(&(*vm)->reactives);
    /* Get rid of the stack */
    buzzdarray_destroy(&(*vm)->stacks);
    /* Get rid of the heap */
@@ -1390,6 +1386,33 @@ buzzvm_state buzzvm_gstore(buzzvm_t vm) {
    buzzobj_t o = buzzvm_stack_at((vm), 1);
    buzzvm_pop(vm);
    buzzvm_pop(vm);
+   /* check if the variable already exists */
+   const buzzobj_t* gsym_obj = buzzdict_get(vm->gsyms, &(str->s.value.sid), buzzobj_t);
+   if(gsym_obj) {
+      /* If object in stack is a reactive variable */
+      if(o->o.reactive_id != 0) {
+         buzzreactive_t op_reactive = *buzzdict_get((vm)->reactives, 
+                                    &(o->o.reactive_id), buzzreactive_t);
+         /* Check expression operands and update */
+         if(op_reactive->expr.op1->o.reactive_id != 0) {
+            buzzset_t dep_set = (*buzzdict_get((vm)->reactives, 
+                                    &(op_reactive->expr.op1->o.reactive_id), 
+                                    buzzreactive_t))->dependents;
+            buzzset_remove(dep_set, &(*gsym_obj)->o.reactive_id);
+         }
+         if(op_reactive->expr.op2->o.reactive_id != 0) {
+            buzzset_t dep_set = (*buzzdict_get((vm)->reactives, 
+                                    &(op_reactive->expr.op2->o.reactive_id), 
+                                    buzzreactive_t))->dependents;
+            buzzset_remove(dep_set, &(*gsym_obj)->o.reactive_id);
+         }
+      }
+      /* If this variable was already declared a reactive variable */
+      else if ((*gsym_obj)->o.reactive_id != 0) {
+         o->o.reactive_id = (*gsym_obj)->o.reactive_id;
+         buzzreactive_recalculate(vm, o);
+      }
+   }
    buzzdict_set((vm)->gsyms, &(str->s.value.sid), &o);
    return BUZZVM_STATE_READY;
 }
