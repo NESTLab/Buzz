@@ -141,27 +141,6 @@ void usage(const char* path, int status) {
    exit(status);
 }
 
-void send_from_stdin(buzzdarray_t clients) {
-    fd_set readfds;
-    FD_ZERO(&readfds);
-    FD_SET(STDIN_FILENO, &readfds);
-    fd_set savefds = readfds;
-
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 0;
-
-    char message[50];
-
-    if (select(1, &readfds, NULL, NULL, &timeout)) {
-        scanf("%s", message);
-        printf("Sending message [%ld]: %s\n", strlen(message), message);
-        send_data(clients, message, strlen(message));
-    }
-
-    readfds = savefds;
-}
-
 int main(int argc, char *argv[]) {
     int server_socket;
     struct sockaddr_in server;
