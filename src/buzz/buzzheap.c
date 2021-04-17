@@ -1,5 +1,6 @@
 #include "buzzheap.h"
 #include "buzzvm.h"
+#include "buzz/buzzreactive.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -186,6 +187,21 @@ void buzzheap_vstig_mark(const void* key, void* data, void* params) {
                           params);
 }
 
+void buzzheap_reactive_mark(const void* key, void* data, void* params) {
+   buzzreactive_t reactive = *(buzzreactive_t*)data;
+   buzzheap_obj_mark(reactive->value, params);
+
+   if (reactive->fptrlist) {
+      buzzdarray_foreach(reactive->fptrlist, buzzheap_darrayobj_mark, params);
+   }
+   if (reactive->expr.op1) {
+      buzzheap_obj_mark(reactive->expr.op1, params);
+   }
+   if (reactive->expr.op2) {
+      buzzheap_obj_mark(reactive->expr.op2, params);
+   }
+}
+
 void buzzheap_listener_mark(const void* key, void* data, void* params) {
    buzzstrman_gc_mark(((buzzvm_t)params)->strings, *(uint16_t*)key);
    buzzheap_obj_mark(*(buzzobj_t*)data, params);
@@ -208,7 +224,7 @@ void buzzheap_gc(struct buzzvm_s* vm) {
    /* Go through all the objects in the VM stack and mark them */
    buzzdarray_foreach(vm->stacks, buzzheap_stack_mark, vm);
    /* Go through all the objects in the reactives and mark them */
-   buzzdict_foreach(vm->reactives, buzzheap_dictobj_mark, vm);
+   buzzdict_foreach(vm->reactives, buzzheap_reactive_mark, vm);
    /* Go through all the objects in the local symbol stack and mark them */
    buzzdarray_foreach(vm->lsymts, buzzheap_lsyms_mark, vm);
    /* Go through all the objects in the virtual stigmergy and mark them */
