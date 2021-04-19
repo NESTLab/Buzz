@@ -139,9 +139,9 @@ void process_in_msgs(buzzvm_t vm, int server_socket) {
       return; // nothing to read
    }
    /* Next is the size of payload */
-   int64_t size_of_incoming_data;
+   uint32_t size_of_incoming_data;
    /* read the size of incoming data */
-   if((bytes_read = read(server_socket, &size_of_incoming_data, sizeof(int64_t))) == 0) {
+   if((bytes_read = read(server_socket, &size_of_incoming_data, sizeof(uint32_t))) == 0) {
       perror("Server disconnected");
       exit(1);
    } else if (bytes_read == -1) {
@@ -152,15 +152,19 @@ void process_in_msgs(buzzvm_t vm, int server_socket) {
       perror("Cannot configure socket to be in blocking mode");
       return;
    }
+   printf("size_of_incoming_data: %ld\n", size_of_incoming_data);
    /* If we got any data */
    if (size_of_incoming_data > 0) {
       /* Create an object to store incoming data */
       char data[size_of_incoming_data];
       /* To loop until we read all the info */
-      int64_t total_read = 0;
+      uint32_t total_read = 0;
       char buffer[1024];
+      uint32_t to_read_in_loop;
       while (total_read < size_of_incoming_data && !stop_signal) {
-         bytes_read = read(server_socket, buffer, sizeof(buffer));
+         to_read_in_loop = fmin(sizeof(buffer), size_of_incoming_data - total_read);
+         printf("to_read_in_loop: %ld, total_read: %ld, size of incoming: %ld\n", to_read_in_loop,  total_read, size_of_incoming_data);
+         bytes_read = read(server_socket, buffer, to_read_in_loop);
          if (bytes_read == 0) {
             perror("Server disconnected");
             exit(1);
@@ -176,7 +180,7 @@ void process_in_msgs(buzzvm_t vm, int server_socket) {
          fprintf(stderr, "Cannot get the complete message, read %ld out of %ld\n", total_read, size_of_incoming_data);
          return; // nothing to read;
       }
-      printf("Received new message of [%ld] bytes\n", total_read);
+      printf("Received new message of [%ld] bytes from Robot: %d\n", total_read, robot_id);
       buzzinmsg_queue_append(vm, robot_id,
                         buzzmsg_payload_frombuffer(buffer, size_of_incoming_data));
       /* Process messages */
@@ -205,25 +209,26 @@ void process_out_msgs(buzzvm_t vm, int server_socket) {
       perror("Cannot configure socket to be in blocking mode");
       return;
    }
-   /* Send robot id to server */
-   if (write(server_socket, &vm->robot, sizeof(vm->robot)) == -1) {
-      perror("Cannot write to server");
-      exit(1);
-   }
    /* Loop through buzzoutmsg queue */
    do {
       /* Are there more messages? */
       if(buzzoutmsg_queue_isempty(vm)) break;
+      /* Send robot id to server */
+      if (write(server_socket, &vm->robot, sizeof(vm->robot)) == -1) {
+         perror("Cannot write to server");
+         exit(1);
+      }
       /* Get first message */
       buzzmsg_payload_t m = buzzoutmsg_queue_first(vm);
+      uint32_t payload_size = buzzmsg_payload_size(m);
       /* Send data(payload) size to server */
-      if (write(server_socket, &buzzmsg_payload_size(m), sizeof(buzzmsg_payload_size(m))) == -1) {
+      if (write(server_socket, &payload_size, sizeof(uint32_t)) == -1) {
          perror("Cannot write to server");
          exit(1);
       }
       /* Send data(payload) to server */
       // printf("Sending %ld bytes from Robot ID: %d\n", buzzmsg_payload_size(m), vm->robot);
-      if (write(server_socket, m->data, buzzmsg_payload_size(m)) == -1) {
+      if (write(server_socket, m->data, payload_size) == -1) {
          perror("Cannot write to server");
          exit(1);
       }
