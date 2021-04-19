@@ -18,6 +18,12 @@
 #define MAX_LOOP_TIME (1.0 / LOOP_RATE)
 
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
+buzzdarray_t clients;
+
+typedef struct {
+   int client_socket;
+   uint16_t robot_id;
+} passed_data_t;
 
 /****************************************/
 /****************************************/
@@ -39,7 +45,7 @@ typedef struct {
 queue* outgoing_queue;
 
 void outgoing_queue_push(queue_data* queue_data) {
-   if(outgoing_queue->last == NULL) { // first element
+   if(outgoing_queue->first == NULL) { // first element
       outgoing_queue->first = queue_data;
    } else {
       outgoing_queue->last->next = queue_data;
@@ -66,25 +72,24 @@ pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 volatile sig_atomic_t stop_signal;
 
+void close_all_client_sockets(uint32_t pos, void* data, void* params) {
+   int client_socket = *(int *) data;
+   close(client_socket);
+}
+
 void interrupt_handler(int signum) {
    stop_signal = 1;
 }
 
-typedef struct {
-   int client_socket;
-   uint16_t robot_id;
-} passed_data_t;
-
 /****************************************/
 /****************************************/
 
-void *broadcaster_thread(void* clients_) {
+void *broadcaster_thread() {
    /* loop setup */
    struct timespec ts_start, ts_end, ts_diff;
    double MAX_LOOP_TIME_INTEGRAL;
    const double MAX_LOOP_TIME_FRACTIONAL_NANO = modf(MAX_LOOP_TIME, &MAX_LOOP_TIME_INTEGRAL) * 1e9;
    clock_gettime(CLOCK_MONOTONIC, &ts_start);
-
    /* Infinite Loop */
    while (!stop_signal) {
       /* Check if any outgoing message is available in queue */
@@ -96,12 +101,11 @@ void *broadcaster_thread(void* clients_) {
          int64_t clients_length;
          /* Get size of clients */
          pthread_mutex_lock(&clients_mutex);
-         buzzdarray_t clients = *(buzzdarray_t*) clients_;
          clients_length = buzzdarray_size(clients);
          pthread_mutex_unlock(&clients_mutex);
          /* If any clients are connected */
          if(clients_length > 0) {
-            printf("forwarding %d bytes to all clients\n", to_send->size);
+            printf("forwarding %d bytes to %ld clients\n", to_send->size, clients_length);
             for (int64_t i = 0; i < clients_length; i++) {
                int client_socket;
                pthread_mutex_lock(&clients_mutex);
@@ -112,16 +116,46 @@ void *broadcaster_thread(void* clients_) {
                   /* Write sender robot id to the client */
                   if (write(client_socket, &to_send->originating_robot_id, sizeof(uint16_t)) == -1) {
                      perror("Cannot write to client");
+                     /* remove this client and adjust loop variables */
+                     pthread_mutex_lock(&clients_mutex);
+                     buzzdarray_remove(clients, i);
+                     i--;
+                     clients_length--;
+                     /* exit for loop (and lose current msg) if no clients left */
+                     if(clients_length == 0) { 
+                        break;
+                     }
+                     pthread_mutex_unlock(&clients_mutex);
                      continue;
                   }
                   /* Write size of data(payload) to the client */
                   if (write(client_socket, &to_send->size, sizeof(uint32_t)) == -1) {
                      perror("Cannot write to client");
+                     /* remove this client and adjust loop variables */
+                     pthread_mutex_lock(&clients_mutex);
+                     buzzdarray_remove(clients, i);
+                     i--;
+                     clients_length--;
+                     /* exit for loop (and lose current msg) if no clients left */
+                     if(clients_length == 0) { 
+                        break;
+                     }
+                     pthread_mutex_unlock(&clients_mutex);
                      continue;
                   }
                   /* Write data(payload) to the client */
                   if (write(client_socket, to_send->data, to_send->size) == -1) {
                      perror("Cannot write to client");
+                     /* remove this client and adjust loop variables */
+                     pthread_mutex_lock(&clients_mutex);
+                     buzzdarray_remove(clients, i);
+                     i--;
+                     clients_length--;
+                     /* exit for loop (and lose current msg) if no clients left */
+                     if(clients_length == 0) { 
+                        break;
+                     }
+                     pthread_mutex_unlock(&clients_mutex);
                      continue;
                   }
                }
@@ -132,7 +166,7 @@ void *broadcaster_thread(void* clients_) {
          free(to_send->data);
          free(to_send);
       }
-   /*=================== Loop rate management ================*/
+      /*=================== Loop rate management ================*/
       clock_gettime(CLOCK_MONOTONIC, &ts_end);
       ts_diff.tv_sec = (long)MAX_LOOP_TIME_INTEGRAL - (ts_end.tv_sec - ts_start.tv_sec);
       ts_diff.tv_nsec = (long)MAX_LOOP_TIME_FRACTIONAL_NANO - (ts_end.tv_nsec - ts_start.tv_nsec);
@@ -162,18 +196,17 @@ void *connection_handler(void *pdata) {
    passed_data_t data = *(passed_data_t *) pdata;
 
    printf("Connection accepted for RobotID: %d\n", data.robot_id);
-   int client_socket = data.client_socket;
    /* Send Robot ID to the connected client */
-   if (write(client_socket, &data.robot_id, sizeof(uint16_t)) == -1) {
+   if (write(data.client_socket, &data.robot_id, sizeof(uint16_t)) == -1) {
          perror("Cannot write to client");
          exit(1);
    }
    while (!stop_signal) {
       /* Check if any data is available from client */
       uint16_t received_robot_id;
-      ssize_t bytes_read = read(client_socket, &received_robot_id, sizeof(uint16_t));
+      ssize_t bytes_read = read(data.client_socket, &received_robot_id, sizeof(uint16_t));
       if(bytes_read == 0) {
-         fprintf(stderr, "Client %d disconnected\n", client_socket);
+         fprintf(stderr, "Client disconnected\n");
          pthread_exit(0);
       } else if (bytes_read == -1) {
          continue; // nothing to read
@@ -184,8 +217,8 @@ void *connection_handler(void *pdata) {
       }
       /* Next is the size of incoming data (payload) */
       uint32_t size_of_incoming_data;
-      if((bytes_read = read(client_socket, &size_of_incoming_data, sizeof(uint32_t))) == 0) {
-         fprintf(stderr, "Client %d disconnected\n", client_socket);
+      if((bytes_read = read(data.client_socket, &size_of_incoming_data, sizeof(uint32_t))) == 0) {
+         fprintf(stderr, "Client %d disconnected\n", received_robot_id);
          pthread_exit(0);
       } else if (bytes_read == -1) {
          continue; // nothing to read
@@ -199,7 +232,7 @@ void *connection_handler(void *pdata) {
       uint32_t to_read_in_loop;
       while (total_read < size_of_incoming_data && !stop_signal) {
          to_read_in_loop = fmin(sizeof(buffer), size_of_incoming_data - total_read);
-         bytes_read = read(client_socket, buffer, to_read_in_loop);
+         bytes_read = read(data.client_socket, buffer, to_read_in_loop);
          if (bytes_read == 0) {
             fprintf(stderr, "client disconnected");
             pthread_exit(0);
@@ -213,14 +246,18 @@ void *connection_handler(void *pdata) {
       /* Check if we have complete data */
       if (total_read < size_of_incoming_data) {
          fprintf(stderr, "Cannot get the complete message, read %d out of %d\n", total_read, size_of_incoming_data);
+         free(incoming_data);
          continue;
       }
       queue_data* to_send = (queue_data*) malloc(sizeof(queue_data));
-      to_send->originating_socket = client_socket;
+      to_send->originating_socket = data.client_socket;
       to_send->originating_robot_id = data.robot_id;
       to_send->size = size_of_incoming_data;
       to_send->data = incoming_data;
       outgoing_queue_push(to_send);
+   }
+   if (data.client_socket) {
+      close(data.client_socket);
    }
    return 0;
 }
@@ -261,17 +298,22 @@ int main(int argc, char *argv[]) {
    }
    /* Configure signals */
    if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
-      perror("Cannot configure to ignore SIGPIPE");
+      perror("Configuring to ignore SIGPIPE failed!");
       exit(1);
    }
-   if (signal(SIGINT, interrupt_handler) == SIG_ERR) {
-      perror("Cannot configure to listen to interrupt signals");
+   /* Configure Interrupt handler */
+   struct sigaction signal_act;
+   signal_act.sa_handler = interrupt_handler;
+   signal_act.sa_flags = 0;
+   sigemptyset(&signal_act.sa_mask);
+   if (sigaction(SIGINT, &signal_act, NULL) == -1) {
+      perror("Configuring sigaction failed!");
       exit(1);
-   }
+    }
    /* Create server socket */
    server_socket = socket(AF_INET, SOCK_STREAM, 0);
    if (server_socket == -1) {
-      perror("socket creation failed");
+      perror("socket creation failed!");
       exit(1);
    }
    /* Configure to reuse same socket */
@@ -298,7 +340,7 @@ int main(int argc, char *argv[]) {
    outgoing_queue->last = NULL;
 
    buzzdarray_t threads = buzzdarray_new(10, sizeof(pthread_t), NULL);
-   buzzdarray_t clients = buzzdarray_new(10, sizeof(int), NULL);
+   clients = buzzdarray_new(10, sizeof(int), NULL);
    pthread_t broadcaster_thread_id;
    /* Broadcsater thread */
    if (pthread_create(&broadcaster_thread_id, NULL, broadcaster_thread, &clients) < 0) {
@@ -327,11 +369,26 @@ int main(int argc, char *argv[]) {
       pthread_mutex_unlock(&clients_mutex);
    }
    /* Join all threads */
-   buzzdarray_foreach(threads, join_all_threads, NULL);
    pthread_join(broadcaster_thread_id, NULL);
+   buzzdarray_foreach(threads, join_all_threads, NULL);
+   /* destructing everything */
    printf("Closing server...\n");
-   buzzdarray_destroy(&threads);
    close(server_socket);
+   buzzdarray_destroy(&threads);
+   /* close all client sockets */
+   pthread_mutex_lock(&clients_mutex);
+   buzzdarray_foreach(clients, close_all_client_sockets, NULL);
+   pthread_mutex_unlock(&clients_mutex);
+   buzzdarray_destroy(&clients);
+   /* Clear outgoing queue */
+   pthread_mutex_lock(&queue_mutex);
+   while(outgoing_queue->first) {
+      queue_data* to_send;
+      to_send = outgoing_queue_pop();
+      free(to_send->data);
+      free(to_send);
+   }
+   pthread_mutex_unlock(&queue_mutex);
    free(outgoing_queue);
    return 0;
 }
