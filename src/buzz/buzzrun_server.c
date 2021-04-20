@@ -13,7 +13,7 @@
 #include <time.h>       // timespec, nanosleep, clock_gettime
 #include <unistd.h>     // read, write, close, sleep
 
-#define LOOP_RATE 10  // cycles per second
+#define LOOP_RATE 50  // cycles per second
 
 #define MAX_LOOP_TIME (1.0 / LOOP_RATE)
 
@@ -228,13 +228,14 @@ void *connection_handler(void *pdata) {
       char* incoming_data = (char*) malloc(size_of_incoming_data * sizeof(char));
       /* To loop until we read all the info */
       uint32_t total_read = 0;
-      char buffer[1024];
+      char buffer[8];
       uint32_t to_read_in_loop;
       while (total_read < size_of_incoming_data && !stop_signal) {
          to_read_in_loop = fmin(sizeof(buffer), size_of_incoming_data - total_read);
          bytes_read = read(data.client_socket, buffer, to_read_in_loop);
          if (bytes_read == 0) {
             fprintf(stderr, "client disconnected");
+            free(incoming_data);
             pthread_exit(0);
          } else if(bytes_read == -1) {
             perror("No more data to read!");
@@ -309,7 +310,7 @@ int main(int argc, char *argv[]) {
    if (sigaction(SIGINT, &signal_act, NULL) == -1) {
       perror("Configuring sigaction failed!");
       exit(1);
-    }
+   }
    /* Create server socket */
    server_socket = socket(AF_INET, SOCK_STREAM, 0);
    if (server_socket == -1) {

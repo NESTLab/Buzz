@@ -147,23 +147,16 @@ void process_in_msgs(buzzvm_t vm, int server_socket) {
    } else if (bytes_read == -1) {
       return; // nothing to read
    }
-   /* Set Server socket to blocking */
-   if (fcntl(server_socket, F_SETFL,  fcntl(server_socket, F_GETFL) & ~(O_NONBLOCK)) < 0) {
-      perror("Cannot configure socket to be in blocking mode");
-      return;
-   }
-   printf("size_of_incoming_data: %ld\n", size_of_incoming_data);
    /* If we got any data */
    if (size_of_incoming_data > 0) {
       /* Create an object to store incoming data */
       char data[size_of_incoming_data];
       /* To loop until we read all the info */
       uint32_t total_read = 0;
-      char buffer[1024];
+      char buffer[8];
       uint32_t to_read_in_loop;
       while (total_read < size_of_incoming_data && !stop_signal) {
          to_read_in_loop = fmin(sizeof(buffer), size_of_incoming_data - total_read);
-         printf("to_read_in_loop: %ld, total_read: %ld, size of incoming: %ld\n", to_read_in_loop,  total_read, size_of_incoming_data);
          bytes_read = read(server_socket, buffer, to_read_in_loop);
          if (bytes_read == 0) {
             perror("Server disconnected");
@@ -177,19 +170,13 @@ void process_in_msgs(buzzvm_t vm, int server_socket) {
       }
       /* Check if we have complete data */
       if (total_read < size_of_incoming_data) {
-         fprintf(stderr, "Cannot get the complete message, read %ld out of %ld\n", total_read, size_of_incoming_data);
+         fprintf(stderr, "Cannot get the complete message, read %d out of %d\n", total_read, size_of_incoming_data);
          return; // nothing to read;
       }
-      printf("Received new message of [%ld] bytes from Robot: %d\n", total_read, robot_id);
       buzzinmsg_queue_append(vm, robot_id,
                         buzzmsg_payload_frombuffer(buffer, size_of_incoming_data));
       /* Process messages */
       buzzvm_process_inmsgs(vm);
-   }
-   /* Set Server socket back to non-blocking */
-   if (fcntl(server_socket, F_SETFL, fcntl(server_socket, F_GETFL) | O_NONBLOCK) < 0) {
-      perror("Cannot configure socket to be in non-blocking mode");
-      exit(1);
    }
 }
 
@@ -227,7 +214,6 @@ void process_out_msgs(buzzvm_t vm, int server_socket) {
          exit(1);
       }
       /* Send data(payload) to server */
-      // printf("Sending %ld bytes from Robot ID: %d\n", buzzmsg_payload_size(m), vm->robot);
       if (write(server_socket, m->data, payload_size) == -1) {
          perror("Cannot write to server");
          exit(1);
@@ -304,12 +290,17 @@ int main(int argc, char** argv) {
    if(server) {
       printf("Connecting to server at %s:%d\n", inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));
       /* Configure signals */
-      if (signal(SIGINT, interrupt_handler) == SIG_ERR) {
-         perror("Cannot configure to listen to interrupt signals");
-         exit(1);
-      }
-      if (signal(SIGPIPE, interrupt_handler) == SIG_ERR) {
-         perror("Cannot configure to stop at SIGPIPE");
+      // if (signal(SIGPIPE, interrupt_handler) == SIG_ERR) {
+      //    perror("Cannot configure to stop at SIGPIPE");
+      //    exit(1);
+      // }
+      /* Configure Interrupt handler */
+      struct sigaction signal_act;
+      signal_act.sa_handler = interrupt_handler;
+      signal_act.sa_flags = 0;
+      sigemptyset(&signal_act.sa_mask);
+      if (sigaction(SIGINT, &signal_act, NULL) == -1) {
+         perror("Configuring sigaction failed!");
          exit(1);
       }
       /* Create server socket */
