@@ -223,7 +223,6 @@ void *connection_handler(void *pdata) {
       } else if (bytes_read == -1) {
          continue; // nothing to read
       }
-      printf("Incoming %d bytes from client %d\n", size_of_incoming_data, data.robot_id);
       /* Create an object to store incoming data */
       char* incoming_data = (char*) malloc(size_of_incoming_data * sizeof(char));
       /* To loop until we read all the info */
@@ -358,7 +357,12 @@ int main(int argc, char *argv[]) {
          .client_socket = client_sock,
          .robot_id = ++robot_ids
       };
-
+      /* Set read timeout */
+      struct timeval tv;
+      tv.tv_sec = 0;
+      tv.tv_usec = 1e5;
+      setsockopt(client_sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
+      /* Create thread */
       if (pthread_create(&thread_id, NULL, connection_handler, &data) < 0) {
          perror("could not create thread");
          return 1;
