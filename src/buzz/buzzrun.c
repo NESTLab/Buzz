@@ -91,13 +91,13 @@ int print(buzzvm_t vm) {
       buzzvm_pop(vm);
       switch(o->o.type) {
          case BUZZTYPE_NIL:
-            fprintf(stdout, "[nil]");
+            fprintf(stdout, "[nil](reactive_id:%d)", o->o.reactive_id);
             break;
          case BUZZTYPE_INT:
-            fprintf(stdout, "%d", o->i.value);
+            fprintf(stdout, "%d(reactive_id:%d)", o->i.value, o->o.reactive_id);
             break;
          case BUZZTYPE_FLOAT:
-            fprintf(stdout, "%f", o->f.value);
+            fprintf(stdout, "%f(reactive_id:%d)", o->f.value, o->o.reactive_id);
             break;
          case BUZZTYPE_TABLE:
             fprintf(stdout, "[table with %d elems]", (buzzdict_size(o->t.value)));
@@ -245,9 +245,7 @@ int main(int argc, char** argv) {
    /* robot ID of current VM */
    uint16_t robot_id = 1;
    /* Parse command line */
-
    if(argc < 3 || argc > 6) usage(argv[0], 0);
-
    for (int i = 1; i < argc - 2; i++) {
       if(strcmp(argv[i], "--trace") == 0) {
          trace = 1;

@@ -12,7 +12,8 @@
    buzzvm_pushcc(vm, buzzvm_function_register(vm, buzzreactive_ ## FNAME));\
    buzzvm_tput(vm);
 
-#define binary_op_arith(op1, oper, op2, res)                               \
+
+#define buzzvm_binary_op(op1, oper, op2, res)                               \
    switch (oper) {                                                         \
       case '+':                                                            \
          res = op1 + op2;                                                  \
@@ -28,28 +29,28 @@
          break;                                                            \
    }
 
-#define buzzvm_binary_op_arith(op1, oper, op2, res)                        \
+#define buzzvm_binary_op_type(op1, oper, op2, res)                         \
    if((op1)->o.type == BUZZTYPE_INT &&                                     \
       (op2)->o.type == BUZZTYPE_INT) {                                     \
       res = buzzheap_newobj((vm), BUZZTYPE_INT);                           \
-      binary_op_arith((op1)->i.value, oper, (op2)->i.value,                \
+      buzzvm_binary_op((op1)->i.value, oper, (op2)->i.value,               \
                                                    (res)->i.value);        \
    }                                                                       \
    else if((op1)->o.type == BUZZTYPE_INT &&                                \
            (op2)->o.type == BUZZTYPE_FLOAT) {                              \
       res = buzzheap_newobj((vm), BUZZTYPE_FLOAT);                         \
-      binary_op_arith((op1)->i.value, oper, (op2)->f.value,                \
+      buzzvm_binary_op((op1)->i.value, oper, (op2)->f.value,               \
                                                    (res)->f.value);        \
    }                                                                       \
    else if((op1)->o.type == BUZZTYPE_FLOAT &&                              \
            (op2)->o.type == BUZZTYPE_INT) {                                \
       res = buzzheap_newobj((vm), BUZZTYPE_FLOAT);                         \
-      binary_op_arith((op1)->f.value, oper, (op2)->i.value,                \
+      buzzvm_binary_op((op1)->f.value, oper, (op2)->i.value,               \
                                                    (res)->f.value);        \
    }                                                                       \
    else {                                                                  \
       res = buzzheap_newobj((vm), BUZZTYPE_FLOAT);                         \
-      binary_op_arith((op1)->f.value, oper, (op2)->f.value,                \
+      buzzvm_binary_op((op1)->f.value, oper, (op2)->f.value,               \
                                                    (res)->f.value);        \
    }
 
@@ -203,7 +204,7 @@ void buzzreactive_recalculate(buzzvm_t vm, buzzobj_t obj) {
       buzzreactive_t reactv = *buzzdict_get((vm)->reactives, 
                                        &(dep_id), buzzreactive_t);
       buzzobj_t res;
-      buzzvm_binary_op_arith(reactv->expr.op1, reactv->expr.optr, reactv->expr.op2, res);
+      buzzvm_binary_op_type(reactv->expr.op1, reactv->expr.optr, reactv->expr.op2, res);
       res->o.reactive_id = dep_id;
       *reactv->value = *res;
       buzzdarray_foreach(reactv->fptrlist,

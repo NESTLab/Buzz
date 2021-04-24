@@ -1,8 +1,2 @@
-x = reactive.create(56.3)
-
-y = x + 5
-
-
-log("before change: ", y)
-x = 3
-log("after change : ", y)
+x = reactive.create(4)
+y = x * x + 2 * x + 1
