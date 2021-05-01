@@ -92,7 +92,6 @@ static uint16_t SWARM_BROADCAST_PERIOD = 10;
                               &(op2->o.reactive_id), buzzreactive_t);   \
          buzzset_insert(op_reactive->dependents, &res->o.reactive_id);  \
       }                                                                 \
-      buzzreactive_recalculate(vm, res);                                \
    }                                                                    \
    return (vm)->state;
 

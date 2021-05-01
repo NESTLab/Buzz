@@ -1,2 +1,11 @@
 x = reactive.create(4)
-y = x * x + 2 * x + 1
+q = reactive.create(5)
+
+y = x * x + 2 * 3 + 1 / q
+
+q = x - 12
+x = 3
+
+log("x = ", x)
+log("y = ", y)
+log("q = ", q)

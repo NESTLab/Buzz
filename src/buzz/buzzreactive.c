@@ -13,7 +13,7 @@
    buzzvm_tput(vm);
 
 
-#define buzzvm_binary_op(op1, oper, op2, res)                               \
+#define buzzvm_binary_op(op1, oper, op2, res)                              \
    switch (oper) {                                                         \
       case '+':                                                            \
          res = op1 + op2;                                                  \
@@ -105,7 +105,7 @@ uint16_t buzzreactive_get_new_rid(buzzvm_t vm) {
 /****************************************/
 /****************************************/
 
-int buzzreactive_deps_cmp(const void* a, const void* b) {
+int buzzreactive_cmp(const void* a, const void* b) {
    uint16_t d1 = *(uint16_t*)a;
    uint16_t d2 = *(uint16_t*)b;
    return d1 - d2;
@@ -129,7 +129,7 @@ buzzreactive_t buzzreactive_create_reactive(buzzvm_t vm, buzzobj_t obj) {
    ret->reactive_id     = obj->o.reactive_id;
    ret->value           = obj;
    ret->dependents      = buzzset_new(sizeof(uint16_t),
-                                       buzzreactive_deps_cmp,
+                                       buzzreactive_cmp,
                                        NULL);
    ret->fptrlist        = buzzdarray_new(1, 
                                        sizeof(buzzobj_t),
@@ -137,6 +137,125 @@ buzzreactive_t buzzreactive_create_reactive(buzzvm_t vm, buzzobj_t obj) {
    /* Add to reactives dictionary in (vm) */
    buzzdict_set(vm->reactives, &(obj->o.reactive_id), &ret);
    return ret;
+}
+
+/****************************************/
+/****************************************/
+
+typedef struct {
+   unsigned int first;
+   unsigned int second;
+} edge;
+
+typedef struct {
+   buzzvm_t vm;
+   buzzobj_t origin_obj;
+   unsigned int max_reactives;
+   edge *edges;
+   uint16_t *visited;
+   uint16_t cur_index;
+} buzz_reactive_recalc_params_t;
+
+typedef struct {
+   buzz_reactive_recalc_params_t* params;
+   uint16_t current_reactive_id;
+} buzz_reactive_params_t;
+
+void spanning_tree_recursive(buzz_reactive_recalc_params_t* params, uint16_t edge);
+
+/****************************************/
+/****************************************/
+
+void buzzreactive_deps_recalc_each(void* data, void* params_) {
+   uint16_t dep_id = *(uint16_t*) data;
+   buzz_reactive_params_t* pars = (buzz_reactive_params_t*) params_;
+   buzz_reactive_recalc_params_t* params = pars->params;
+
+   if (!params->visited[dep_id]) {
+      buzzreactive_t dep_var = *buzzdict_get(params->vm->reactives, 
+                                       &(dep_id), buzzreactive_t);
+      /* update operand with the value */
+      if (dep_var->expr.op1->o.reactive_id == params->origin_obj->o.reactive_id) {
+         dep_var->expr.op1 = params->origin_obj;
+      }
+      if (dep_var->expr.op2->o.reactive_id == params->origin_obj->o.reactive_id) {
+         dep_var->expr.op2 = params->origin_obj;
+      }
+      edge ed = {
+         .first = pars->current_reactive_id,
+         .second = dep_id
+      };
+      params->edges[params->cur_index++] = ed;
+      params->visited[dep_id] = 1;
+      spanning_tree_recursive(params, dep_id);
+   }
+}
+
+/****************************************/
+/****************************************/
+
+void spanning_tree_recursive(buzz_reactive_recalc_params_t* params, uint16_t reactive_id) {
+   buzzreactive_t reactive_var = *buzzdict_get(params->vm->reactives, 
+                                       &(reactive_id), buzzreactive_t);
+   buzz_reactive_params_t pars = {
+      .current_reactive_id = reactive_id,
+      .params = params
+   };
+   buzzset_foreach(reactive_var->dependents, buzzreactive_deps_recalc_each, &pars);
+}
+
+/****************************************/
+/****************************************/
+
+size_t BFS(uint16_t start_reactive_id, edge* edges, const size_t MAX_SIZE, uint16_t * out) {
+   struct queue {
+      uint16_t reactive_ids[MAX_SIZE];
+      size_t front;
+      size_t rear;
+   };
+   /* Create variables */
+   struct queue my_queue;
+   my_queue.front = -1;
+   my_queue.rear = -1;
+   uint16_t *visited = calloc(MAX_SIZE, sizeof(uint16_t));
+   size_t out_idx = 0;
+   size_t visited_idx = 0;
+   
+   /* Add first edge to the queue */
+   my_queue.front = 0;
+   my_queue.rear = 0;
+   my_queue.reactive_ids[0] = start_reactive_id;
+   out[out_idx++] = start_reactive_id;
+
+   /* Run until queue is not empty */
+   while (my_queue.front <= my_queue.rear) {
+      /* pop from queue */
+      uint16_t val = my_queue.reactive_ids[my_queue.front++];
+      /* Add it to visited */
+      visited[visited_idx++] = val;
+      /* loop through all edges to find ones starting with val */
+      for (uint16_t i = 0; i < MAX_SIZE; i++) {
+         if(edges[i].first == val) {
+            /* if its not in visited */
+            int second_is_visited = 0;
+            for (size_t j = 0; j < visited_idx; j++) {
+               if (visited[j] == edges[i].second) {
+                  second_is_visited = 1;
+                  break;
+               }
+            }
+            /* If the second was not visited */
+            if (!second_is_visited) {
+               /* Add to the queue */
+               my_queue.reactive_ids[++my_queue.rear] = edges[i].second;
+               /* Add to output */
+               out[out_idx++] = edges[i].second;
+            }
+         }
+      }
+   }
+   free(visited);
+   return out_idx;
 }
 
 /****************************************/
@@ -153,65 +272,56 @@ void buzzreactive_fptrlist_callback_tree(uint32_t pos, void* data, void* params)
 /****************************************/
 /****************************************/
 
-struct deps_recalc_params {
-   buzzdarray_t to_recalculate;
-   buzzvm_t vm;
-   buzzobj_t obj;
-};
-
-void buzzreactive_deps_recalc_each(void* data, void* params_) {
-   uint16_t dep_id = *(uint16_t*) data;
-   struct deps_recalc_params params = *(struct deps_recalc_params*) params_;
-   buzzdarray_push(params.to_recalculate, &dep_id);
-   buzzreactive_t dep_var = *buzzdict_get(params.vm->reactives, 
-                                       &(dep_id), buzzreactive_t);
-   /* update operand the value */
-   if (dep_var->expr.op1->o.reactive_id == params.obj->o.reactive_id) {
-      dep_var->expr.op1 = params.obj;
-   }
-   if (dep_var->expr.op2->o.reactive_id == params.obj->o.reactive_id) {
-      dep_var->expr.op2 = params.obj;
-   }
-   buzzreactive_recalc_update_val(params.vm, dep_id, params.obj, params.to_recalculate);
-}
-
-void buzzreactive_recalc_update_val(buzzvm_t vm, uint16_t reactive_id,
-                              buzzobj_t obj, buzzdarray_t to_recalculate) {
-   if(reactive_id != 0) {
-      buzzreactive_t reactive_var = *buzzdict_get((vm)->reactives, 
-                                       &(reactive_id), buzzreactive_t);
-      struct deps_recalc_params params = {
-         .vm = vm,
-         .to_recalculate = to_recalculate,
-         .obj = obj
-      };
-      /* Loop through all its dependents */
-      buzzset_foreach(reactive_var->dependents, buzzreactive_deps_recalc_each, &params);
-   }
-}
-
-/****************************************/
-/****************************************/
-
 void buzzreactive_recalculate(buzzvm_t vm, buzzobj_t obj) {
-   /* List of all the variables to recalculate */
-   buzzdarray_t to_recalculate = buzzdarray_new(1, sizeof(uint16_t), NULL);
    /* Recursively update all reactive variables values */
-   buzzreactive_recalc_update_val(vm, obj->o.reactive_id, obj, to_recalculate);
-   /* re-calculate all values using saved expression */
-   for (uint32_t i = 0; i < buzzdarray_size(to_recalculate); ++i) {   
-      uint16_t dep_id = buzzdarray_get(to_recalculate, i, uint16_t);
-      buzzreactive_t reactv = *buzzdict_get((vm)->reactives, 
-                                       &(dep_id), buzzreactive_t);
-      buzzobj_t res;
-      buzzvm_binary_op_type(reactv->expr.op1, reactv->expr.optr, reactv->expr.op2, res);
-      res->o.reactive_id = dep_id;
-      *reactv->value = *res;
-      buzzdarray_foreach(reactv->fptrlist,
-                        buzzreactive_fptrlist_callback_tree, vm);
+   const unsigned int MAX_REACTIVES_COUNT = buzzdict_size(vm->reactives);
+   buzz_reactive_recalc_params_t params = {
+      .vm = vm,
+      .origin_obj = obj,
+      .max_reactives = MAX_REACTIVES_COUNT,
+      .edges = malloc((MAX_REACTIVES_COUNT) * sizeof(edge)),
+      .visited = calloc(MAX_REACTIVES_COUNT, sizeof(uint16_t)),
+      .cur_index = 0
+   };
+   if (params.visited == NULL || params.edges == NULL) {
+      free(params.visited);
+      free(params.edges);
+      params.edges = NULL;
+      return ;            // TODO
    }
-   // TODO: Write a mechanism to find cyclic loops
-   buzzdarray_destroy(&to_recalculate);
+   /* Run spanning tree to get only once */
+   spanning_tree_recursive(&params, obj->o.reactive_id);
+   /* Max size is double the number of edges() */
+   const size_t MAX_SIZE = params.cur_index * 2;
+   /* run BFS to get the order right */
+   uint16_t *reactives_list = calloc(MAX_SIZE, sizeof(uint16_t));
+   size_t count = BFS(obj->o.reactive_id, params.edges, MAX_SIZE, reactives_list);
+   /* Print */
+   for (uint16_t i = 0; i < params.cur_index; i++) {
+      printf("[%d] : %d -> %d\n", i, params.edges[i].first, params.edges[i].second);
+   }
+   printf("OUTPUT (%ld):\n", count);
+
+   printf("Starting with : <reactive_id:%d>\n", obj->o.reactive_id);
+   for (size_t i = 1; i < count; i++) {
+      printf(" %d ->", reactives_list[i]);
+      buzzreactive_t reactv = *buzzdict_get((vm)->reactives, 
+                                       &(reactives_list[i]), buzzreactive_t);
+      if(reactv) {
+         buzzobj_t res;
+         buzzvm_binary_op_type(reactv->expr.op1, 
+                                       reactv->expr.optr, reactv->expr.op2, res);
+         res->o.reactive_id = reactives_list[i];
+         *reactv->value = *res;
+         buzzdarray_foreach(reactv->fptrlist,
+                                       buzzreactive_fptrlist_callback_tree, vm);
+      }
+   }
+   printf("\n");
+
+   free(params.visited);
+   free(reactives_list);
+   free(params.edges);
 }
 
 /****************************************/
