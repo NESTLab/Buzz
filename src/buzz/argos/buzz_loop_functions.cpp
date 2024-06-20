@@ -49,15 +49,20 @@ void BuzzPut(buzzvm_t t_vm,
 /****************************************/
 /****************************************/
 
-void BuzzTableOpen(buzzvm_t t_vm,
-                   const std::string& str_var) {
+bool BuzzTableOpen(buzzvm_t t_vm,
+                   const std::string& str_var,
+                   bool b_create) {
    buzzvm_pushs(t_vm, buzzvm_string_register(t_vm, str_var.c_str(), 1));
    buzzvm_dup(t_vm);
    buzzvm_gload(t_vm);
    if(!buzzobj_istable(buzzvm_stack_at(t_vm, 1))) {
+      if(!b_create) {
+         return false;
+      }
       buzzvm_pop(t_vm);
       buzzvm_pusht(t_vm);
    }
+   return true;
 }
 
 /****************************************/
@@ -168,49 +173,64 @@ void BuzzTablePut(buzzvm_t t_vm,
 /****************************************/
 /****************************************/
 
-void BuzzTableOpenNested(buzzvm_t t_vm,
-                         int n_key) {
+bool BuzzTableOpenNested(buzzvm_t t_vm,
+                         int n_key,
+                         bool b_create) {
    buzzvm_dup(t_vm);
    buzzvm_pushi(t_vm, n_key);
    buzzvm_push(t_vm, buzzvm_stack_at(t_vm, 2));
    buzzvm_pushi(t_vm, n_key);
    buzzvm_tget(t_vm);
    if(!buzzobj_istable(buzzvm_stack_at(t_vm, 1))) {
+      if(!b_create) {
+         return false;
+      }
       buzzvm_pop(t_vm);
       buzzvm_pusht(t_vm);
    }
+   return true;
 }
 
 /****************************************/
 /****************************************/
 
-void BuzzTableOpenNested(buzzvm_t t_vm,
-                         float f_key) {
+bool BuzzTableOpenNested(buzzvm_t t_vm,
+                         float f_key,
+                         bool b_create) {
    buzzvm_dup(t_vm);
    buzzvm_pushf(t_vm, f_key);
    buzzvm_push(t_vm, buzzvm_stack_at(t_vm, 2));
    buzzvm_pushf(t_vm, f_key);
    buzzvm_tget(t_vm);
    if(!buzzobj_istable(buzzvm_stack_at(t_vm, 1))) {
+      if(!b_create) {
+         return false;
+      }
       buzzvm_pop(t_vm);
       buzzvm_pusht(t_vm);
    }
+   return true;
 }
 
 /****************************************/
 /****************************************/
 
-void BuzzTableOpenNested(buzzvm_t t_vm,
-                         const std::string& str_key) {
+bool BuzzTableOpenNested(buzzvm_t t_vm,
+                         const std::string& str_key,
+                         bool b_create) {
    buzzvm_dup(t_vm);
    buzzvm_pushs(t_vm, buzzvm_string_register(t_vm, str_key.c_str(), 0));
    buzzvm_push(t_vm, buzzvm_stack_at(t_vm, 2));
    buzzvm_pushs(t_vm, buzzvm_string_register(t_vm, str_key.c_str(), 0));
    buzzvm_tget(t_vm);
    if(!buzzobj_istable(buzzvm_stack_at(t_vm, 1))) {
+      if(!b_create) {
+         return false;
+      }
       buzzvm_pop(t_vm);
       buzzvm_pusht(t_vm);
    }
+   return true;
 }
 
 /****************************************/
