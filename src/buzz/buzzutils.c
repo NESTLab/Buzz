@@ -5,8 +5,8 @@
 
 float buzzobj_tofloat(buzzvm_t  t_vm,
                       buzzobj_t t_obj) {
-   if(t_obj->o.type == BUZZTYPE_FLOAT) return buzzobj_getint(t_obj);
-   if(t_obj->o.type == BUZZTYPE_INT)   return (float)buzzobj_getint(t_obj);
+   if(buzzobj_isfloat(t_obj)) return buzzobj_getint(t_obj);
+   if(buzzobj_isint(t_obj))   return (float)buzzobj_getint(t_obj);
    buzzvm_seterror(t_vm, BUZZVM_ERROR_TYPE,
                    "expected number, got %s",
                    buzztype_desc[t_obj->o.type]);
@@ -15,8 +15,8 @@ float buzzobj_tofloat(buzzvm_t  t_vm,
 
 int32_t buzzobj_toint(buzzvm_t  t_vm,
                       buzzobj_t t_obj) {
-   if(t_obj->o.type == BUZZTYPE_INT)   return buzzobj_getint(t_obj);
-   if(t_obj->o.type == BUZZTYPE_FLOAT) return (int32_t)buzzobj_getfloat(t_obj);
+   if(buzzobj_isint(t_obj))   return buzzobj_getint(t_obj);
+   if(buzzobj_isfloat(t_obj)) return (int32_t)buzzobj_getfloat(t_obj);
    buzzvm_seterror(t_vm, BUZZVM_ERROR_TYPE,
                    "expected number, got %s",
                    buzztype_desc[t_obj->o.type]);
@@ -25,7 +25,7 @@ int32_t buzzobj_toint(buzzvm_t  t_vm,
 
 const char* buzzobj_tostr(buzzvm_t  t_vm,
                           buzzobj_t t_obj) {
-   if(t_obj->o.type == BUZZTYPE_STRING) return buzzobj_getstring(t_obj);
+   if(buzzobj_isstring(t_obj)) return buzzobj_getstring(t_obj);
    buzzvm_seterror(t_vm, BUZZVM_ERROR_TYPE,
                    "expected string, got %s",
                    buzztype_desc[t_obj->o.type]);
@@ -44,7 +44,7 @@ const char* buzzobj_tostr(buzzvm_t  t_vm,
       buzzvm_tget(t_vm);                                              \
       buzzobj_t tVal = buzzvm_stack_at(t_vm, 1);                      \
       buzzvm_pop(t_vm);                                               \
-      return (tVal->o.type != BUZZTYPE_NIL) ? tVal : NULL;            \
+      return (buzzobj_isnil(tVal)) ? tVal : NULL;                     \
    }
 
 buzztable_get(i, int32_t);
@@ -58,7 +58,7 @@ buzzobj_t buzztable_sget(buzzvm_t    t_vm,
    buzzvm_tget(t_vm);
    buzzobj_t tVal = buzzvm_stack_at(t_vm, 1);
    buzzvm_pop(t_vm);
-   return (tVal->o.type != BUZZTYPE_NIL) ? tVal : NULL;
+   return (buzzobj_isnil(tVal)) ? tVal : NULL;
 }
 
 /****************************************/
@@ -109,7 +109,7 @@ void buzztable_fset(buzzvm_t  t_vm,
    buzzvm_push(t_vm, t_val);
    buzzvm_tput(t_vm);
 }
-   
+
 void buzztable_sset(buzzvm_t    t_vm,
                     buzzobj_t   t_table,
                     const char* str_key,
