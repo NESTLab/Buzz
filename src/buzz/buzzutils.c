@@ -5,7 +5,7 @@
 
 float buzzobj_tofloat(buzzvm_t  t_vm,
                       buzzobj_t t_obj) {
-   if(buzzobj_isfloat(t_obj)) return buzzobj_getint(t_obj);
+   if(buzzobj_isfloat(t_obj)) return buzzobj_getfloat(t_obj);
    if(buzzobj_isint(t_obj))   return (float)buzzobj_getint(t_obj);
    buzzvm_seterror(t_vm, BUZZVM_ERROR_TYPE,
                    "expected number, got %s",
@@ -20,7 +20,7 @@ int32_t buzzobj_toint(buzzvm_t  t_vm,
    buzzvm_seterror(t_vm, BUZZVM_ERROR_TYPE,
                    "expected number, got %s",
                    buzztype_desc[t_obj->o.type]);
-   return 0.0f;
+   return 0;
 }
 
 const char* buzzobj_tostr(buzzvm_t  t_vm,
@@ -44,7 +44,7 @@ const char* buzzobj_tostr(buzzvm_t  t_vm,
       buzzvm_tget(t_vm);                                              \
       buzzobj_t tVal = buzzvm_stack_at(t_vm, 1);                      \
       buzzvm_pop(t_vm);                                               \
-      return (buzzobj_isnil(tVal)) ? tVal : NULL;                     \
+      return (buzzobj_isnil(tVal)) ? NULL : tVal;                     \
    }
 
 buzztable_get(i, int32_t);
@@ -133,7 +133,7 @@ void buzztable_foreach_entry_trampoline(const void* pt_key,
                                         void* pt_val,
                                         void* pt_params) {
    struct buzztable_foreach_params* p = pt_params;
-   p->fn(p->vm, (buzzobj_t)pt_key, (buzzobj_t)pt_val, p->params);
+   p->fn(p->vm, *(buzzobj_t*)pt_key, *(buzzobj_t*)pt_val, p->params);
 }
 
 void buzztable_foreach(buzzvm_t                t_vm,
@@ -157,7 +157,7 @@ buzzobj_t buzzglobal_get(buzzvm_t    t_vm,
    buzzvm_gload(t_vm);
    buzzobj_t tVal = buzzvm_stack_at(t_vm, 1);
    buzzvm_pop(t_vm);
-   return (buzzobj_isnil(tVal)) ? tVal : NULL;
+   return (buzzobj_isnil(tVal)) ? NULL : tVal;
 }
 
 void buzzglobal_set(buzzvm_t    t_vm,
