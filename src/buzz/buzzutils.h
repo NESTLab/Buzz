@@ -143,4 +143,4 @@ extern "C" {
 }
 #endif
 
-#endif /* BUZZ_UTILS_H */
+#endif // BUZZUTILS_H
