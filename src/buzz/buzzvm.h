@@ -436,7 +436,7 @@ extern "C" {
     * #1 value
     * #2 idx
     * #3 table
-    * This operation pops #1 and #2, leaving the table at the stack top.
+    * This operation pops all operands.
     * @param vm The VM data.
     */
    extern buzzvm_state buzzvm_tput(buzzvm_t vm);
@@ -449,9 +449,8 @@ extern "C" {
     * The stack is expected to be as follows:
     * #1 idx
     * #2 table
-    * This operation pops #1 and pushes the value, leaving the table at
-    * stack #2. If the element for the given idx is not found, nil is
-    * pushed as value.
+    * This operation pops all operands and pushes the value. If the element for
+    * the given idx is not found, nil is pushed as value.
     * @param vm The VM data.
     */
    extern buzzvm_state buzzvm_tget(buzzvm_t vm);
