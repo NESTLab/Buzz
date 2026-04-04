@@ -26,7 +26,7 @@ extern "C" {
     * Sets a VM error and returns NULL on failure.
     */
    gsl_matrix* buzzgsl_togsl(buzzvm_t  t_vm,
-                             buzzobj_t t_mat);
+                             buzzobj_t t_obj);
 
    /**
     * Packs a GSL matrix into a freshly allocated Buzz matrix table.

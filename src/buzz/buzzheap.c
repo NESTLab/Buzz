@@ -93,7 +93,9 @@ buzzobj_t buzzheap_clone(buzzvm_t vm, const buzzobj_t o) {
          return x;
       }
       case BUZZTYPE_USERDATA: {
-         x->u.value = o->u.value;
+         x->u.destroy = o->u.destroy;
+         x->u.clone   = o->u.clone;
+         x->u.value   = o->u.clone ? o->u.clone(o->u.value) : o->u.value;
          return x;
       }
       case BUZZTYPE_CLOSURE: {

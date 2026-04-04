@@ -62,11 +62,15 @@ buzzobj_t buzzobj_new(uint16_t type) {
 /****************************************/
 
 void buzzobj_destroy(buzzobj_t* o) {
-   if((*o)->o.type == BUZZTYPE_TABLE) {
+   if(buzzobj_istable(*o)) {
       buzzdict_destroy(&((*o)->t.value));
    }
-   else if((*o)->o.type == BUZZTYPE_CLOSURE) {
+   else if(buzzobj_isclosure(*o)) {
       buzzdarray_destroy(&((*o)->c.value.actrec));
+   }
+   else if(buzzobj_isuserdata(*o)) {
+      if((*o)->u.destroy)
+         (*o)->u.destroy((*o)->u.value);
    }
    free(*o);
    *o = NULL;

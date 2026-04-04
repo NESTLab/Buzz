@@ -25,6 +25,7 @@ add_library(buzz SHARED
   buzzstrman.h buzzstrman.c
   buzzmath.h buzzmath.c
   buzzgsl.h buzzgsl.c
+  buzzlinalg.h buzzlinalg.c
   buzzio.h buzzio.c
   buzzstring.h buzzstring.c
   buzzutils.h buzzutils.c

@@ -88,7 +88,9 @@ extern "C" {
    typedef struct {
       uint16_t type;
       uint16_t marker;
-      void*    value;
+      void*    value;             // pointed-at resource
+      void     (*destroy)(void*); // NULL = nothing done to `value`
+      void*    (*clone)(void*);   // NULL = shallow copy
    } buzzuserdata_t;
 
    /*
@@ -96,16 +98,16 @@ extern "C" {
     */
    union buzzobj_u {
       struct {
-         uint16_t type;    // object type
-         uint16_t marker;  // marker for garbage collection
-      }              o;    // as a generic object
-      buzznil_t      n;    // as nil
-      buzzint_t      i;    // as integer
-      buzzfloat_t    f;    // as floating-point
-      buzzstring_t   s;    // as string
-      buzztable_t    t;    // as table
-      buzzclosure_t  c;    // as closure
-      buzzuserdata_t u;    // as user data
+         uint16_t type;   // object type
+         uint16_t marker; // marker for garbage collection
+      }              o;   // as a generic object
+      buzznil_t      n;   // as nil
+      buzzint_t      i;   // as integer
+      buzzfloat_t    f;   // as floating-point
+      buzzstring_t   s;   // as string
+      buzztable_t    t;   // as table
+      buzzclosure_t  c;   // as closure
+      buzzuserdata_t u;   // as user data
    };
    typedef union buzzobj_u* buzzobj_t;
 
