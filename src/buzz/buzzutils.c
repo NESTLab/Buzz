@@ -147,3 +147,26 @@ void buzztable_foreach(buzzvm_t                t_vm,
    };
    buzzdict_foreach(t_table->t.value, buzztable_foreach_entry_trampoline, &p);
 }
+
+/****************************************/
+/****************************************/
+
+buzzobj_t buzzglobal_get(buzzvm_t    t_vm,
+                         const char* str_var) {
+   buzzvm_pushs(t_vm, buzzvm_string_register(t_vm, str_var, 1));
+   buzzvm_gload(t_vm);
+   buzzobj_t tVal = buzzvm_stack_at(t_vm, 1);
+   buzzvm_pop(t_vm);
+   return (buzzobj_isnil(tVal)) ? tVal : NULL;
+}
+
+void buzzglobal_set(buzzvm_t    t_vm,
+                    const char* str_var,
+                    buzzobj_t   t_obj) {
+   buzzvm_pushs(t_vm, buzzvm_string_register(t_vm, str_var, 1));
+   buzzvm_push(t_vm, t_obj);
+   buzzvm_gstore(t_vm);
+}
+
+/****************************************/
+/****************************************/

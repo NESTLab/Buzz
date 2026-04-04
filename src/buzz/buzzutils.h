@@ -123,32 +123,21 @@ extern "C" {
                           void*                   pt_data);
 
    /****************************************/
-   /* Table allocation                     */
-   /****************************************/
-
-   /**
-    * Allocates a new empty table on the Buzz heap.
-    * The caller is responsible for rooting it (e.g. storing in a global or
-    * returning via buzzvm_ret1) before the next GC cycle.
-    */
-   buzzobj_t BuzzTableNew(buzzvm_t vm);
-
-   /****************************************/
    /* Global variable access               */
    /****************************************/
 
    /**
     * Loads a global variable by name.  Returns NULL if not found.
     */
-   buzzobj_t BuzzGlobalGet(buzzvm_t vm,
-                           const char* str_var);
+   buzzobj_t buzzglobal_get(buzzvm_t    t_vm,
+                            const char* str_var);
 
    /**
     * Stores obj as a global variable under str_var.
     */
-   void BuzzGlobalSet(buzzvm_t vm,
-                      const char* str_var,
-                      buzzobj_t obj);
+   void buzzglobal_set(buzzvm_t    t_vm,
+                       const char* str_var,
+                       buzzobj_t   t_obj);
 
 #ifdef __cplusplus
 }
