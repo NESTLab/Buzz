@@ -58,7 +58,7 @@ buzzobj_t buzztable_sget(buzzvm_t    t_vm,
    buzzvm_tget(t_vm);
    buzzobj_t tVal = buzzvm_stack_at(t_vm, 1);
    buzzvm_pop(t_vm);
-   return (buzzobj_isnil(tVal)) ? tVal : NULL;
+   return (buzzobj_isnil(tVal)) ? NULL : tVal;
 }
 
 /****************************************/
