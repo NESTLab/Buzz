@@ -21,17 +21,13 @@ extern "C" {
 #endif
 
    /**
-    * Unpacks a Buzz matrix table into a freshly allocated GSL matrix.
-    * Caller is responsible for calling gsl_matrix_free() on the result.
-    * Sets a VM error and returns NULL on failure.
+    * Unpacks a Buzz matrix into a freshly allocated GSL matrix.
     */
    gsl_matrix* buzzgsl_togsl(buzzvm_t  t_vm,
                              buzzobj_t t_obj);
 
    /**
-    * Packs a GSL matrix into a freshly allocated Buzz matrix table.
-    * Caller must root the result before the next GC cycle.
-    * Does not free the GSL matrix.
+    * Packs a GSL matrix into a freshly allocated Buzz matrix.
     */
    buzzobj_t buzzgsl_fromgsl(buzzvm_t          t_vm,
                              const gsl_matrix* mat);

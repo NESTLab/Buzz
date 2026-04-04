@@ -86,7 +86,7 @@ static int buzzmat_add(buzzvm_t vm) {
    buzzvm_lload(vm, 2);
    buzzvm_type_assert(vm, 2, BUZZTYPE_USERDATA);
    buzzvm_type_assert(vm, 1, BUZZTYPE_USERDATA);
-   gsl_matrix* A = buzzgsl_togsl(vm, buzzvm_stack_at(vm, 1));
+   gsl_matrix* A = buzzgsl_togsl(vm, buzzvm_stack_at(vm, 2));
    if(!A) return vm->state;
    gsl_matrix* B = buzzgsl_togsl(vm, buzzvm_stack_at(vm, 1));
    if(!B) return vm->state;            /* no gsl_matrix_free(A) — we don't own it */
@@ -112,7 +112,7 @@ static int buzzmat_sub(buzzvm_t vm) {
    buzzvm_lload(vm, 2);
    buzzvm_type_assert(vm, 2, BUZZTYPE_USERDATA);
    buzzvm_type_assert(vm, 1, BUZZTYPE_USERDATA);
-   gsl_matrix* A = buzzgsl_togsl(vm, buzzvm_stack_at(vm, 1));
+   gsl_matrix* A = buzzgsl_togsl(vm, buzzvm_stack_at(vm, 2));
    if(!A) return vm->state;
    gsl_matrix* B = buzzgsl_togsl(vm, buzzvm_stack_at(vm, 1));
    if(!B) return vm->state;            /* no gsl_matrix_free(A) — we don't own it */
@@ -137,7 +137,7 @@ static int buzzmat_scale(buzzvm_t vm) {
    buzzvm_lload(vm, 1);
    buzzvm_lload(vm, 2);
    buzzvm_type_assert(vm, 2, BUZZTYPE_USERDATA);
-   gsl_matrix* A = buzzgsl_togsl(vm, buzzvm_stack_at(vm, 1));
+   gsl_matrix* A = buzzgsl_togsl(vm, buzzvm_stack_at(vm, 2));
    if(!A) return vm->state;
    float s = buzzobj_tofloat(vm, buzzvm_stack_at(vm, 1));
    if(vm->state != BUZZVM_STATE_READY) return vm->state;
@@ -159,10 +159,10 @@ static int buzzmat_mul(buzzvm_t vm) {
    buzzvm_lload(vm, 2);
    buzzvm_type_assert(vm, 2, BUZZTYPE_USERDATA);
    buzzvm_type_assert(vm, 1, BUZZTYPE_USERDATA);
-   gsl_matrix* A = buzzgsl_togsl(vm, buzzvm_stack_at(vm, 1));
+   gsl_matrix* A = buzzgsl_togsl(vm, buzzvm_stack_at(vm, 2));
    if(!A) return vm->state;
    gsl_matrix* B = buzzgsl_togsl(vm, buzzvm_stack_at(vm, 1));
-   if(!B) { gsl_matrix_free(A); return vm->state; }
+   if(!B) return vm->state;
    if(A->size2 != B->size1) {
       buzzvm_seterror(vm, BUZZVM_ERROR_TYPE, "mat.mul: dimension mismatch");
       return vm->state;
