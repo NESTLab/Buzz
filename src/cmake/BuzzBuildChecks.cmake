@@ -5,3 +5,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Find the ARGoS package, make sure to save the ARGoS prefix
 find_package(ARGoS COMPONENTS footbot eyebot spiri)
+
+# Find GSL
+find_package(GSL REQUIRED)

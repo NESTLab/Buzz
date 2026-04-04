@@ -24,11 +24,12 @@ add_library(buzz SHARED
   buzzneighbors.h buzzneighbors.c
   buzzstrman.h buzzstrman.c
   buzzmath.h buzzmath.c
+  buzzgsl.h buzzgsl.c
   buzzio.h buzzio.c
   buzzstring.h buzzstring.c
   buzzutils.h buzzutils.c
   buzzvm.h buzzvm.c)
-target_link_libraries(buzz m)
+target_link_libraries(buzz m GSL::gsl GSL::gslcblas)
 install(TARGETS buzz LIBRARY DESTINATION lib)
 install(DIRECTORY . DESTINATION include/buzz FILES_MATCHING PATTERN "*.h")
 
