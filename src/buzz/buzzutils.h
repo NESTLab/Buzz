@@ -95,12 +95,57 @@ extern "C" {
                        buzzobj_t t_table,
                        float     f_key,
                        buzzobj_t t_val);
-   
+
    void buzztable_sset(buzzvm_t    t_vm,
                        buzzobj_t   t_table,
                        const char* str_key,
                        buzzobj_t   t_val);
-   
+
+   void buzztable_iset_int(buzzvm_t  t_vm,
+                           buzzobj_t t_table,
+                           int32_t   n_key,
+                           int32_t   n_val);
+
+   void buzztable_iset_float(buzzvm_t  t_vm,
+                             buzzobj_t t_table,
+                             int32_t   n_key,
+                             float     f_val);
+
+   void buzztable_iset_str(buzzvm_t    t_vm,
+                           buzzobj_t   t_table,
+                           int32_t     n_key,
+                           const char* str_val);
+
+   void buzztable_fset_int(buzzvm_t  t_vm,
+                           buzzobj_t t_table,
+                           float     f_key,
+                           int32_t   n_val);
+
+   void buzztable_fset_float(buzzvm_t  t_vm,
+                             buzzobj_t t_table,
+                             float     f_key,
+                             float     f_val);
+
+   void buzztable_fset_str(buzzvm_t    t_vm,
+                           buzzobj_t   t_table,
+                           float       f_key,
+                           const char* str_val);
+
+   void buzztable_sset_int(buzzvm_t    t_vm,
+                           buzzobj_t   t_table,
+                           const char* str_key,
+                           int32_t     n_val);
+
+   void buzztable_sset_float(buzzvm_t    t_vm,
+                             buzzobj_t   t_table,
+                             const char* str_key,
+                             float       f_val);
+
+   void buzztable_sset_str(buzzvm_t    t_vm,
+                           buzzobj_t   t_table,
+                           const char* str_key,
+                           const char* str_val);
+
    /****************************************/
    /* Table iteration                      */
    /****************************************/

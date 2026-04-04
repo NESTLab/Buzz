@@ -120,6 +120,60 @@ void buzztable_sset(buzzvm_t    t_vm,
    buzzvm_tput(t_vm);
 }
 
+#define buzztable_set_type(KEY_SIG, KEY_TYPE, VAL_SIG1, VAL_SIG2, VAL_TYPE) \
+   void buzztable_ ## KEY_SIG ## set_ ## VAL_SIG1(buzzvm_t  t_vm,           \
+                                                 buzzobj_t t_table,         \
+                                                 KEY_TYPE  key,             \
+                                                 VAL_TYPE  val) {           \
+      buzzvm_push(t_vm, t_table);                                           \
+      buzzvm_push ## KEY_SIG(t_vm, key);                                    \
+      buzzvm_push ## VAL_SIG2(t_vm, val);                                   \
+      buzzvm_tput(t_vm);                                                    \
+   }
+
+buzztable_set_type(i, int32_t, int,   i, int32_t);
+buzztable_set_type(i, int32_t, float, f, float);
+buzztable_set_type(f, float,   int,   i, int32_t);
+buzztable_set_type(f, float,   float, f, float);
+
+#define buzztable_set_str(KEY_SIG, KEY_TYPE)                            \
+   void buzztable_ ## KEY_SIG ## set_ ## str(buzzvm_t  t_vm,            \
+                                             buzzobj_t t_table,         \
+                                             KEY_TYPE  key,             \
+                                             const char* str_val) {     \
+      buzzvm_push(t_vm, t_table);                                       \
+      buzzvm_push ## KEY_SIG(t_vm, key);                                \
+      buzzvm_pushs(t_vm, buzzvm_string_register(t_vm, str_val, 1));     \
+      buzzvm_tput(t_vm);                                                \
+   }
+
+buzztable_set_str(i, int32_t);
+buzztable_set_str(f, float);
+
+#define buzztable_sset_type(VAL_SIG1, VAL_SIG2, VAL_TYPE)               \
+   void buzztable_sset_ ## VAL_SIG1(buzzvm_t    t_vm,                   \
+                                    buzzobj_t   t_table,                \
+                                    const char* str_key,                \
+                                    VAL_TYPE    val) {                  \
+      buzzvm_push(t_vm, t_table);                                       \
+      buzzvm_pushs(t_vm, buzzvm_string_register(t_vm, str_key, 1));     \
+      buzzvm_push ## VAL_SIG2(t_vm, val);                               \
+      buzzvm_tput(t_vm);                                                \
+   }
+
+buzztable_sset_type(int,   i, int32_t);
+buzztable_sset_type(float, f, float);
+
+void buzztable_sset_str(buzzvm_t    t_vm,
+                        buzzobj_t   t_table,
+                        const char* str_key,
+                        const char* str_val) {
+   buzzvm_push(t_vm, t_table);
+   buzzvm_pushs(t_vm, buzzvm_string_register(t_vm, str_key, 1));
+   buzzvm_pushs(t_vm, buzzvm_string_register(t_vm, str_val, 1));
+   buzzvm_tput(t_vm);
+}
+
 /****************************************/
 /****************************************/
 
