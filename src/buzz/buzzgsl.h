@@ -1,14 +1,6 @@
 #ifndef BUZZGSL_H
 #define BUZZGSL_H
 
-/**
- * Buzz-GSL bridge.
- *
- * Buzz matrix representation:
- *   {.r = <rows>, .c = <cols>, .d = {0=v00, 1=v01, ..., r*c-1=v(r-1)(c-1)}}
- * Elements stored in row-major order.
- */
-
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
