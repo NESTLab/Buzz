@@ -1,0 +1,123 @@
+# test_layer3.bzz — exercises the mat.* API
+
+var n_pass = 0
+var n_fail = 0
+
+function check(name, cond) {
+   if(cond) {
+      log("[PASS] ", name)
+      n_pass = n_pass + 1
+   } else {
+      log("[FAIL] ", name)
+      n_fail = n_fail + 1
+   }
+}
+
+function close(a, b) {
+   return math.abs(a - b) < 0.0001
+}
+
+function init() {}
+
+function step() {
+
+   #  mat.new 
+   var Z = mat.new(2, 3)
+   check("mat.new zeroed",  close(mat.get(Z, 0, 0), 0.0))
+   check("mat.new zeroed",  close(mat.get(Z, 1, 2), 0.0))
+
+   #  mat.set / mat.get 
+   mat.set(Z, 0, 0, 7.0)
+   mat.set(Z, 1, 2, 5.0)
+   check("mat.set/get [0,0]", close(mat.get(Z, 0, 0), 7.0))
+   check("mat.set/get [1,2]", close(mat.get(Z, 1, 2), 5.0))
+   check("mat.set/get [0,1]", close(mat.get(Z, 0, 1), 0.0))
+
+   #  mat.eye 
+   var I = mat.eye(3)
+   check("mat.eye [0,0]",  close(mat.get(I, 0, 0), 1.0))
+   check("mat.eye [1,1]",  close(mat.get(I, 1, 1), 1.0))
+   check("mat.eye [2,2]",  close(mat.get(I, 2, 2), 1.0))
+   check("mat.eye [0,1]",  close(mat.get(I, 0, 1), 0.0))
+   check("mat.eye [1,0]",  close(mat.get(I, 1, 0), 0.0))
+
+   #  mat.add 
+   var A = mat.eye(2)
+   var B = mat.eye(2)
+   var C = mat.add(A, B)
+   check("mat.add [0,0]",  close(mat.get(C, 0, 0), 2.0))
+   check("mat.add [1,1]",  close(mat.get(C, 1, 1), 2.0))
+   check("mat.add [0,1]",  close(mat.get(C, 0, 1), 0.0))
+
+   #  mat.sub 
+   var D = mat.sub(C, A)
+   check("mat.sub [0,0]",  close(mat.get(D, 0, 0), 1.0))
+   check("mat.sub [0,1]",  close(mat.get(D, 0, 1), 0.0))
+
+   #  mat.scale 
+   var E = mat.scale(mat.eye(2), 3.0)
+   check("mat.scale [0,0]", close(mat.get(E, 0, 0), 3.0))
+   check("mat.scale [1,1]", close(mat.get(E, 1, 1), 3.0))
+   check("mat.scale [0,1]", close(mat.get(E, 0, 1), 0.0))
+
+   #  mat.mul: I * I = I 
+   var F = mat.mul(mat.eye(3), mat.eye(3))
+   check("mat.mul I*I [0,0]", close(mat.get(F, 0, 0), 1.0))
+   check("mat.mul I*I [1,1]", close(mat.get(F, 1, 1), 1.0))
+   check("mat.mul I*I [0,1]", close(mat.get(F, 0, 1), 0.0))
+
+   #  mat.mul: known 2x3 * 3x2 
+   # [[1,2,3],[4,5,6]] * [[7,8],[9,10],[11,12]] = [[58,64],[139,154]]
+   var P = mat.new(2, 3)
+   mat.set(P, 0, 0, 1.0) mat.set(P, 0, 1, 2.0) mat.set(P, 0, 2, 3.0)
+   mat.set(P, 1, 0, 4.0) mat.set(P, 1, 1, 5.0) mat.set(P, 1, 2, 6.0)
+   var Q = mat.new(3, 2)
+   mat.set(Q, 0, 0,  7.0) mat.set(Q, 0, 1,  8.0)
+   mat.set(Q, 1, 0,  9.0) mat.set(Q, 1, 1, 10.0)
+   mat.set(Q, 2, 0, 11.0) mat.set(Q, 2, 1, 12.0)
+   var R = mat.mul(P, Q)
+   check("mat.mul [0,0]", close(mat.get(R, 0, 0),  58.0))
+   check("mat.mul [0,1]", close(mat.get(R, 0, 1),  64.0))
+   check("mat.mul [1,0]", close(mat.get(R, 1, 0), 139.0))
+   check("mat.mul [1,1]", close(mat.get(R, 1, 1), 154.0))
+
+   #  mat.t 
+   var G = mat.new(2, 3)
+   mat.set(G, 0, 0, 1.0) mat.set(G, 0, 1, 2.0) mat.set(G, 0, 2, 3.0)
+   mat.set(G, 1, 0, 4.0) mat.set(G, 1, 1, 5.0) mat.set(G, 1, 2, 6.0)
+   var Gt = mat.t(G)
+   check("mat.t [0,0]",  close(mat.get(Gt, 0, 0), 1.0))
+   check("mat.t [1,0]",  close(mat.get(Gt, 1, 0), 2.0))
+   check("mat.t [2,0]",  close(mat.get(Gt, 2, 0), 3.0))
+   check("mat.t [0,1]",  close(mat.get(Gt, 0, 1), 4.0))
+   check("mat.t [2,1]",  close(mat.get(Gt, 2, 1), 6.0))
+
+   #  mat.inv: inv(I) = I 
+   var Ii = mat.inv(mat.eye(3))
+   check("mat.inv I [0,0]", close(mat.get(Ii, 0, 0), 1.0))
+   check("mat.inv I [0,1]", close(mat.get(Ii, 0, 1), 0.0))
+
+   #  mat.inv: known 2x2 
+   # inv([[4,7],[2,6]]) = [[0.6,-0.7],[-0.2,0.4]]
+   var M = mat.new(2, 2)
+   mat.set(M, 0, 0, 4.0) mat.set(M, 0, 1, 7.0)
+   mat.set(M, 1, 0, 2.0) mat.set(M, 1, 1, 6.0)
+   var Mi = mat.inv(M)
+   check("mat.inv [0,0]",  close(mat.get(Mi, 0, 0),  0.6))
+   check("mat.inv [0,1]",  close(mat.get(Mi, 0, 1), -0.7))
+   check("mat.inv [1,0]",  close(mat.get(Mi, 1, 0), -0.2))
+   check("mat.inv [1,1]",  close(mat.get(Mi, 1, 1),  0.4))
+
+   #  mat.chol 
+   # [[4,2],[2,3]] -> L = [[2,0],[1,sqrt(2)]]
+   var S = mat.new(2, 2)
+   mat.set(S, 0, 0, 4.0) mat.set(S, 0, 1, 2.0)
+   mat.set(S, 1, 0, 2.0) mat.set(S, 1, 1, 3.0)
+   var L = mat.chol(S)
+   check("mat.chol [0,0]", close(mat.get(L, 0, 0), 2.0))
+   check("mat.chol [0,1]", close(mat.get(L, 0, 1), 0.0))
+   check("mat.chol [1,0]", close(mat.get(L, 1, 0), 1.0))
+   check("mat.chol [1,1]", close(mat.get(L, 1, 1), math.sqrt(2.0)))
+
+   log(n_pass, " passed, ", n_fail, " failed ")
+}

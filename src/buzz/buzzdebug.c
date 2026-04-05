@@ -522,3 +522,33 @@ void buzzdebug_backtrace(buzzvm_t vm,
 
 /****************************************/
 /****************************************/
+
+struct buzzdebug_gsyms_dump_params_s {
+   buzzvm_t vm;
+   FILE* stream;
+};
+
+static void buzzdebug_gsyms_dump_funp(const void* key,
+                                      void* data,
+                                      void* params) {
+   struct buzzdebug_gsyms_dump_params_s* p = params;
+   // They key is always a string sid
+   fprintf(p->stream, "[%s] -> ",
+           buzzstrman_get(p->vm->strings, *(uint16_t*)key));
+   // The value can be any object
+   buzzdebug_print_obj(p->stream, *(buzzobj_t*)data, p->vm);
+   fprintf(p->stream, "\n");
+}
+
+void buzzdebug_gsyms_dump(buzzvm_t vm,
+                          FILE* stream) {
+   struct buzzdebug_gsyms_dump_params_s p = {
+      .vm = vm,
+      .stream = stream
+   };
+   buzzdict_foreach(vm->gsyms, buzzdebug_gsyms_dump_funp, &p);
+}
+
+/****************************************/
+/****************************************/
+

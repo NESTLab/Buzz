@@ -196,6 +196,14 @@ extern "C" {
                                    buzzdebug_t dbg,
                                    FILE* stream);
 
+   /**
+    * Dumps the current global symbol table.
+    * @param vm The VM data.
+    * @param stream The output stream.
+    */
+   extern void buzzdebug_gsyms_dump(buzzvm_t vm,
+                                    FILE* stream);
+
 #ifdef __cplusplus
 }
 #endif

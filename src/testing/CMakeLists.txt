@@ -1,6 +1,44 @@
 #
 # Test programs
 #
+enable_testing()
+
+add_executable(test_layer1 test_layer1.c ../buzz/buzzutils.c)
+target_link_libraries(test_layer1 buzz)
+add_test(NAME layer1 COMMAND test_layer1)
+
+add_executable(test_layer2 test_layer2.c
+  ../buzz/buzzutils.c
+  ../buzz/buzzgsl.c)
+target_link_libraries(test_layer2 buzz GSL::gsl GSL::gslcblas)
+add_test(NAME layer2 COMMAND test_layer2)
+
+add_executable(test_layer3_harness test_layer3_harness.c
+  ../buzz/buzzutils.c
+  ../buzz/buzzgsl.c
+  ../buzz/buzzlinalg.c
+  ../buzz/buzzdebug.c
+  ../buzz/buzzasm.c)
+target_link_libraries(test_layer3_harness buzz GSL::gsl GSL::gslcblas)
+
+add_custom_command(
+  OUTPUT  ${CMAKE_CURRENT_BINARY_DIR}/test_layer3.bo
+  ${CMAKE_CURRENT_BINARY_DIR}/test_layer3.bdb
+  COMMAND ${CMAKE_BINARY_DIR}/utility/bzzc
+  -b ${CMAKE_CURRENT_BINARY_DIR}/test_layer3.bo
+  -d ${CMAKE_CURRENT_BINARY_DIR}/test_layer3.bdb
+  ${CMAKE_CURRENT_SOURCE_DIR}/test_layer3.bzz
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/test_layer3.bzz
+  ${CMAKE_BINARY_DIR}/utility/bzzc
+)
+
+add_custom_target(test_layer3_bzz ALL
+  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/test_layer3.bo)
+
+add_test(NAME layer3
+  COMMAND test_layer3_harness
+  ${CMAKE_CURRENT_BINARY_DIR}/test_layer3.bo
+  ${CMAKE_CURRENT_BINARY_DIR}/test_layer3.bdb)
 
 add_executable(testbuzzdarray testbuzzdarray.c)
 target_link_libraries(testbuzzdarray buzz)
