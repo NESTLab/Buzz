@@ -71,10 +71,13 @@ void BuzzPut(buzzvm_t t_vm,
  *
  * @param t_vm The Buzz VM.
  * @param str_var The variable name that stores the table.
+ * @param b_create Make the table if does not exists [default = true].
+ * @return bool if successfully opened the table.
  * @see BuzzTableClose
  */
-void BuzzTableOpen(buzzvm_t t_vm,
-                   const std::string& str_var);
+bool BuzzTableOpen(buzzvm_t t_vm,
+                   const std::string& str_var,
+                   bool b_create = true);
 
 /**
  * Closes the currently open table and stores it as a global variable.
@@ -221,10 +224,13 @@ void BuzzTablePut(buzzvm_t t_vm,
  *
  * @param t_vm The Buzz VM.
  * @param n_key The key.
+ * @param b_create Make the table if does not exists [default = true].
+ * @return bool if successfully opened the table.
  * @see BuzzTableCloseNested
  */
-void BuzzTableOpenNested(buzzvm_t t_vm,
-                         int n_key);
+bool BuzzTableOpenNested(buzzvm_t t_vm,
+                         int n_key,
+                         bool b_create = true);
 
 /**
  * Opens a table nested in the currently open table.
@@ -234,10 +240,13 @@ void BuzzTableOpenNested(buzzvm_t t_vm,
  *
  * @param t_vm The Buzz VM.
  * @param f_key The key.
+ * @param b_create Make the table if does not exists [default = true].
+ * @return bool if successfully opened the table.
  * @see BuzzTableCloseNested
  */
-void BuzzTableOpenNested(buzzvm_t t_vm,
-                         float f_key);
+bool BuzzTableOpenNested(buzzvm_t t_vm,
+                         float f_key,
+                         bool b_create = true);
 
 /**
  * Opens a table nested in the currently open table.
@@ -247,10 +256,13 @@ void BuzzTableOpenNested(buzzvm_t t_vm,
  *
  * @param t_vm The Buzz VM.
  * @param str_key The key.
+ * @param b_create Make the table if does not exists [default = true].
+ * @return bool if successfully opened the table.
  * @see BuzzTableCloseNested
  */
-void BuzzTableOpenNested(buzzvm_t t_vm,
-                         const std::string& str_key);
+bool BuzzTableOpenNested(buzzvm_t t_vm,
+                         const std::string& str_key,
+                         bool b_create = true);
 
 /**
  * Closes the currently open table and stores it in the parent table.
