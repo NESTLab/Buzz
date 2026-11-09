@@ -4,6 +4,34 @@
 #include <gsl/gsl_linalg.h>
 
 /****************************************/
+/* mat.rows(m) -> int                      */
+/****************************************/
+
+static int buzzmat_rows(buzzvm_t vm) {
+   buzzvm_lnum_assert(vm, 1);
+   buzzvm_lload(vm, 1);
+   buzzvm_type_assert(vm, 1, BUZZTYPE_USERDATA);
+   gsl_matrix* m = buzzgsl_togsl(vm, buzzvm_stack_at(vm, 3));
+   if(!m) return vm->state;
+   buzzvm_pushi(vm, m->size1);
+   return buzzvm_ret1(vm);
+}
+
+/****************************************/
+/* mat.cols(m) -> int                      */
+/****************************************/
+
+static int buzzmat_cols(buzzvm_t vm) {
+   buzzvm_lnum_assert(vm, 1);
+   buzzvm_lload(vm, 1);
+   buzzvm_type_assert(vm, 1, BUZZTYPE_USERDATA);
+   gsl_matrix* m = buzzgsl_togsl(vm, buzzvm_stack_at(vm, 3));
+   if(!m) return vm->state;
+   buzzvm_pushi(vm, m->size2);
+   return buzzvm_ret1(vm);
+}
+
+/****************************************/
 /* mat.new(r, c) -> mat                 */
 /****************************************/
 
@@ -16,6 +44,43 @@ static int buzzmat_new(buzzvm_t vm) {
    int32_t c = buzzobj_toint(vm, buzzvm_stack_at(vm, 1));
    if(vm->state != BUZZVM_STATE_READY) return vm->state;
    buzzvm_push(vm, buzzgsl_fromgsl(vm, gsl_matrix_calloc(r, c)));
+   return buzzvm_ret1(vm);
+}
+
+/****************************************/
+/* mat.zero(r, c) -> mat                */
+/****************************************/
+
+static int buzzmat_zero(buzzvm_t vm) {
+   buzzvm_lnum_assert(vm, 2);
+   buzzvm_lload(vm, 1);
+   buzzvm_lload(vm, 2);
+   int32_t r = buzzobj_toint(vm, buzzvm_stack_at(vm, 2));
+   if(vm->state != BUZZVM_STATE_READY) return vm->state;
+   int32_t c = buzzobj_toint(vm, buzzvm_stack_at(vm, 1));
+   if(vm->state != BUZZVM_STATE_READY) return vm->state;
+   buzzvm_push(vm, buzzgsl_fromgsl(vm, gsl_matrix_calloc(r, c)));
+   return buzzvm_ret1(vm);
+}
+
+/****************************************/
+/* mat.all(r, c, x) -> mat              */
+/****************************************/
+
+static int buzzmat_all(buzzvm_t vm) {
+   buzzvm_lnum_assert(vm, 3);
+   buzzvm_lload(vm, 1);
+   buzzvm_lload(vm, 2);
+   buzzvm_lload(vm, 3);
+   int32_t r = buzzobj_toint(vm, buzzvm_stack_at(vm, 3));
+   if(vm->state != BUZZVM_STATE_READY) return vm->state;
+   int32_t c = buzzobj_toint(vm, buzzvm_stack_at(vm, 2));
+   if(vm->state != BUZZVM_STATE_READY) return vm->state;
+   float x = buzzobj_tofloat(vm, buzzvm_stack_at(vm, 1));
+   if(vm->state != BUZZVM_STATE_READY) return vm->state;
+   gsl_matrix* m = gsl_matrix_alloc(r, c);
+   gsl_matrix_set_all(m, x);
+   buzzvm_push(vm, buzzgsl_fromgsl(vm, m));
    return buzzvm_ret1(vm);
 }
 
@@ -252,26 +317,30 @@ static int buzzmat_chol(buzzvm_t vm) {
 /* Registration                         */
 /****************************************/
 
-#define BUZZ_REGISTER_MAT_FN(VM, TABLE, NAME, FN)         \
-   buzzvm_dup(VM);                                        \
-   buzzvm_pushs(VM, buzzvm_string_register(VM, NAME, 1)); \
-   buzzvm_pushcc(VM, buzzvm_function_register(VM, FN));   \
-   buzzvm_tput(VM);
+#define function_register(FNAME)                                        \
+   buzzvm_dup(vm);                                                      \
+   buzzvm_pushs(vm, buzzvm_string_register(vm, #FNAME, 1));             \
+   buzzvm_pushcc(vm, buzzvm_function_register(vm, buzzmat_ ## FNAME));  \
+   buzzvm_tput(vm);
 
 buzzvm_state buzzlinalg_register(buzzvm_t vm) {
    buzzvm_pushs(vm, buzzvm_string_register(vm, "mat", 1));
    buzzvm_pusht(vm);
-   BUZZ_REGISTER_MAT_FN(vm, mat, "new",   buzzmat_new);
-   BUZZ_REGISTER_MAT_FN(vm, mat, "eye",   buzzmat_eye);
-   BUZZ_REGISTER_MAT_FN(vm, mat, "get",   buzzmat_get);
-   BUZZ_REGISTER_MAT_FN(vm, mat, "set",   buzzmat_set);
-   BUZZ_REGISTER_MAT_FN(vm, mat, "add",   buzzmat_add);
-   BUZZ_REGISTER_MAT_FN(vm, mat, "sub",   buzzmat_sub);
-   BUZZ_REGISTER_MAT_FN(vm, mat, "scale", buzzmat_scale);
-   BUZZ_REGISTER_MAT_FN(vm, mat, "mul",   buzzmat_mul);
-   BUZZ_REGISTER_MAT_FN(vm, mat, "t",     buzzmat_t);
-   BUZZ_REGISTER_MAT_FN(vm, mat, "inv",   buzzmat_inv);
-   BUZZ_REGISTER_MAT_FN(vm, mat, "chol",  buzzmat_chol);
+   function_register(rows);
+   function_register(cols);
+   function_register(new);
+   function_register(zero);
+   function_register(all);
+   function_register(eye);
+   function_register(get);
+   function_register(set);
+   function_register(add);
+   function_register(sub);
+   function_register(scale);
+   function_register(mul);
+   function_register(t);
+   function_register(inv);
+   function_register(chol);
    buzzvm_gstore(vm);
    return vm->state;
 }

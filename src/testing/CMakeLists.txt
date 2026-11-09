@@ -24,12 +24,16 @@ target_link_libraries(test_layer3_harness buzz GSL::gsl GSL::gslcblas)
 add_custom_command(
   OUTPUT  ${CMAKE_CURRENT_BINARY_DIR}/test_layer3.bo
   ${CMAKE_CURRENT_BINARY_DIR}/test_layer3.bdb
-  COMMAND ${CMAKE_BINARY_DIR}/utility/bzzc
+  COMMAND ${CMAKE_COMMAND} -E env
+  BZZPARSE=$<TARGET_FILE:bzzparse>
+  BZZASM=$<TARGET_FILE:bzzasm>
+  ${CMAKE_BINARY_DIR}/utility/bzzc
   -b ${CMAKE_CURRENT_BINARY_DIR}/test_layer3.bo
   -d ${CMAKE_CURRENT_BINARY_DIR}/test_layer3.bdb
   ${CMAKE_CURRENT_SOURCE_DIR}/test_layer3.bzz
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/test_layer3.bzz
   ${CMAKE_BINARY_DIR}/utility/bzzc
+  bzzparse bzzasm
 )
 
 add_custom_target(test_layer3_bzz ALL
